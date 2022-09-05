@@ -15,5 +15,15 @@
   		<artifactId>mage-sets</artifactId>
   		<version>1.4.50</version>
   	</dependency>
+  	<dependency>
+  		<groupId>org.mage</groupId>
+  		<artifactId>mage-player-ai-mcts</artifactId>
+  		<version>1.4.50</version>
+  	</dependency>
+  	<dependency>
+  		<groupId>org.mage</groupId>
+  		<artifactId>mage-player-ai</artifactId>
+  		<version>1.4.50</version>
+  	</dependency>
   </dependencies>
 </project>
