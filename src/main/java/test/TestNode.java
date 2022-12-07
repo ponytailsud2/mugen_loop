@@ -2,12 +2,18 @@ package test;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Stack;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
+import mage.MageItem;
+import mage.MageObject;
 import mage.abilities.Ability;
 import mage.abilities.ActivatedAbility;
 import mage.abilities.Mode;
+import mage.abilities.TriggeredAbility;
 import mage.game.ExileZone;
 import mage.game.Game;
 import mage.game.GameState;
@@ -34,6 +40,9 @@ public class TestNode {
 	private int tappedPermanentCount = 0;
 	private int handCount = 0;
 	private int loopStepCount = 0;
+	
+	//
+	private Stack<MageItem> availableTarget = new Stack<MageItem>();
 	
 	//use String gameState.getValue as gameState
 	public TestNode(UUID playerId,Game game) {
@@ -109,46 +118,94 @@ public class TestNode {
 		if(player.getNextAction() == null) {
 			
 		}
-		List<Ability> abilities;
-        if (!USE_ACTION_CACHE)
-            abilities = player.getPlayableOptions(game);
-        else
-            abilities = getPlayables(player, stateValue, game);
-        for (Ability ability: abilities) {
-            Game sim = game.copy();
-//            logger.info("expand " + ability.toString());
-            MCTSPlayer simPlayer = (MCTSPlayer) sim.getPlayer(player.getId());
-            simPlayer.activateAbility((ActivatedAbility)ability, sim);
-            sim.resume();
-            children.add(new TestNode(this, sim, ability));
-        }
-        game = null;
+		switch (player.getNextAction()) {
+		case PRIORITY:
+			List<Ability> abilities;
+			if (!USE_ACTION_CACHE)
+				abilities = player.getPlayableOptions(game);
+			else
+				abilities = getPlayables(player, stateValue, game);
+			for (Ability ability: abilities) {
+				Game sim = game.copy();
+//       	     logger.info("expand " + ability.toString());
+				TestTreePlayer simPlayer = (TestTreePlayer) sim.getPlayer(player.getId());
+				simPlayer.activateAbility((ActivatedAbility)ability, sim);
+				sim.resume();
+				children.add(new TestNode(this, sim, ability));
+			}
+			break;
+		case TRIGGERED:
+			HashMap<Ability,TriggeredAbility> triggeredAbilities = ((TestGame)game).getTriggeringOptions();
+			for (Ability ability: triggeredAbilities.keySet()) {
+				Game sim = game.copy();
+//       	     logger.info("expand " + ability.toString());
+				TestTreePlayer simPlayer = (TestTreePlayer) sim.getPlayer(player.getId());
+				sim.getState().removeTriggeredAbility(triggeredAbilities.get(ability));
+				simPlayer.triggerAbility((TriggeredAbility)ability, sim);
+				
+				sim.resume();
+				children.add(new TestNode(this, sim, ability));
+			}
+			break;
+		default:
+			break;
+        
+		}
+		game = null;
+	}
+	
+	public void expandChoose(Ability source, Target availableTarget,Game game) {
+		List<? extends Target> targets = availableTarget.getTargetOptions(source, game);
+		
 	}
 	
 	//may use .getvalue to check if the state has passed but 
 	public boolean isLoop() {
+		//check same states
 		for(String state: this.parentStates) {
 			if(state.equals(this.stateValue)) {
 				return true;
 			}
 		}
+		//check infinite damage
+		for(UUID player: this.game.getPlayerList()) {
+			if(player != this.playerId) {
+				if(this.game.getPlayer(player).getLife() <= 0) {
+					return true;
+				}
+			}
+		}
 		
+		//check no resources reduces
 		if(this.handCount >= parent.handCount) {
 			if(this.tappedPermanentCount >= parent.tappedPermanentCount) {
 				this.loopStepCount = parent.loopStepCount + 1;
 			}
 		}
 		
-		if(loopStepCount >= 5) {
+		if(loopStepCount >= 10) {
 			return true;
 		}
 		
 		return false;
 	}
 	
+	public boolean isLeaf() {
+		return children.isEmpty();
+	}
+	
+	private static final ConcurrentHashMap<String, List<Ability>> playablesCache = new ConcurrentHashMap<String, List<Ability>>();
+	
     private List<Ability> getPlayables(TestTreePlayer player, String stateValue2, Game game2) {
 		// TODO Auto-generated method stub
-		return null;
+    	if(playablesCache.containsKey(stateValue2)) {
+    		return playablesCache.get(stateValue2);
+    	}
+    	else {
+    		List<Ability> abilities = player.getPlayableOptions(game2);
+    		playablesCache.put(stateValue2, abilities);
+    		return abilities;
+    	}
 	}
 
 	public boolean isTerminal() {
@@ -165,6 +222,10 @@ public class TestNode {
 
     public TestNode getParent() {
         return parent;
+    }
+    
+    public String getStateValue() {
+    	return stateValue;
     }
 
 }
