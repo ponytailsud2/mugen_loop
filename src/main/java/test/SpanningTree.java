@@ -22,6 +22,7 @@ public class SpanningTree {
 		
 		this.player = player1;
 		this.opponent = player2;
+		player.setTree(this);
 		this.rootGame = new TestGame(this);
 		player.init(rootGame,true);
 		opponent.init(rootGame,true);
@@ -30,8 +31,25 @@ public class SpanningTree {
 		
 	}
 	
+	
+	public TestTreePlayer getPlayer() {
+		return player;
+	}
+
+
+
+	public void setPlayer(TestTreePlayer player) {
+		this.player = player;
+	}
+
+
+
 	public void triggeringProcess(){
 		player.setNextAction(NextAction.TRIGGERED);
+		root.expand();
+	}
+	
+	public void chooseProcess() {
 		root.expand();
 	}
 	

@@ -37,85 +37,83 @@ import mage.game.turn.PreCombatMainStep;
 import mage.player.ai.ComputerPlayer;
 import mage.player.ai.MCTSPlayer;
 import mage.players.PlayerImpl;
+import test.TestGame.CurrentAction;
 
 public class TestMain {
 	
+	
+	
 	public static void main(String[] args) {
 		BasicConfigurator.configure();
-		// TODO Auto-generated method stub
-		TestTriggerOptionPlayer testPlayer = new TestTriggerOptionPlayer("test");
-		AlwaysPassPlayer testPlayer2 = new AlwaysPassPlayer(new UUID(1,1),"test2");
-		UUID owner = testPlayer.getId();
 		
+//		CardSetInfo info = new CardSetInfo("","","",Rarity.COMMON);
+//		AbbeyMatron testCard = new AbbeyMatron(owner,info);
+//		BattleflightEagle eagle = new BattleflightEagle(owner, info);
+//		AnabaShaman testAnaba = new AnabaShaman(owner,info);
+//		Plains testPlains = new Plains(owner,info);
 		
-		CardSetInfo info = new CardSetInfo("","","",Rarity.COMMON);
-		AbbeyMatron testCard = new AbbeyMatron(owner,info);
-		BattleflightEagle eagle = new BattleflightEagle(owner, info);
-		AnabaShaman testAnaba = new AnabaShaman(owner,info);
-		Plains testPlains = new Plains(owner,info);
-		
-		TwoPlayerDuel testGame = new TwoPlayerDuel(MultiplayerAttackOption.LEFT,RangeOfInfluence.ALL,new LondonMulligan(0),20,7);
-		
-//		TestGame testGame = new TestGame(new SpanningTree(testPlayer));
-		testGame.setSimulation(false);
-		//test
-		testPlayer.init(testGame,true);
-		testPlayer2.init(testGame,true);
-		testGame.addPlayer(testPlayer,new Deck());
-		testGame.addPlayer(testPlayer2,new Deck());
-		
-		System.out.println(testGame.getStartingLife());
-		System.out.println(testGame.getPlayer(testPlayer2.getId()).getLibrary().size());
-		ArrayList<PermanentCard> lands = lands(6,owner,testGame);
-		ArrayList<PermanentCard> lands2 = lands(6,owner,testGame);
-		PermanentCard anabafield = new PermanentCard(new AnabaShaman(owner,info),owner,testGame);
-		ArrayList<Card> hand = new ArrayList<Card>();
-		ArrayList<Card> hand2 = new ArrayList<Card>();
-		//hand.add(testCard);
-		hand.add(eagle);
-		//hand.add(testPlains);
-		lands.add(anabafield);
-		testPlayer.updateRange(testGame);
-		testPlayer2.updateRange(testGame);
-		GameOptions testGameOptions = new GameOptions();
-		testGameOptions.testMode = true;
-		
-		testGame.cheat(testPlayer.getId(),library(testPlayer.getId(),testGame), hand, lands, new ArrayList<Card>(), new ArrayList<Card>());
-		
-		
-		testGame.cheat(testPlayer2.getId(),library(testPlayer2.getId(),testGame), hand2, lands2, new ArrayList<Card>(), new ArrayList<Card>());
-		testGame.setGameOptions(testGameOptions);
-//		anabafield.removeSummoningSickness();
-		System.out.println("eagle: "+eagle.getId());
-		System.out.println(testPlayer.getHand());
-		System.out.println("Playable: "+testPlayer.getPlayableOptions(testGame).size());
-		System.out.println("Activate: ");
-//		testGame.startSim(testPlayer.getId());
-		System.out.println("Playable: "+testPlayer2.getPlayableOptions(anabafield.getAbilities().get(0), testGame));
-//		System.out.println(testCard);
-		
-		System.out.println(testGame.getPhase());
-//		System.out.println(testGame.checkIfGameIsOver());
-		testGame.start(owner);
-		System.out.println("Players: "+testGame.getState().getPlayers());
-		System.out.println("Mana left: "+testPlayer.getManaAvailable(testGame));
-		System.out.println(testPlayer.activateAbility(eagle.getSpellAbility(), testGame));
-		System.out.println("Mana left: "+testPlayer.getManaAvailable(testGame));
-		System.out.println(testGame.getStack());
-//		System.out.println("Active: "+testGame.getState().getActivePlayerId());
-//		System.out.println(testGame.getState().getPlayerList().size());
+//		TwoPlayerDuel testGame = new TwoPlayerDuel(MultiplayerAttackOption.LEFT,RangeOfInfluence.ALL,new LondonMulligan(0),20,7);
 //		
-//		//testCard.playCard(testGame, Zone.HAND, Zone.BATTLEFIELD, owner);
-//		//		testPlayer.beginTurn(testGame);
-////		//HumanPlayer h = new HumanPlayer();
-		System.out.println(anabafield.isControlledBy(owner));
-		System.out.println(anabafield.isPhasedIn());
-		//anabafield.removeSummoningSickness();
-		System.out.println(anabafield.wasControlledFromStartOfControllerTurn());
-		System.out.println("tap: "+anabafield.isTapped());
-
-		System.out.println(testGame.getBattlefield());
-		System.out.println(testGame.getBattlefield().getAllActivePermanents(testPlayer2.getId()));
+////		TestGame testGame = new TestGame(new SpanningTree(testPlayer));
+//		testGame.setSimulation(false);
+//		//test
+//		testPlayer.init(testGame,true);
+//		testPlayer2.init(testGame,true);
+//		testGame.addPlayer(testPlayer,new Deck());
+//		testGame.addPlayer(testPlayer2,new Deck());
+//		
+//		System.out.println(testGame.getStartingLife());
+//		System.out.println(testGame.getPlayer(testPlayer2.getId()).getLibrary().size());
+//		ArrayList<PermanentCard> lands = lands(6,owner,testGame);
+//		ArrayList<PermanentCard> lands2 = lands(6,owner,testGame);
+//		PermanentCard anabafield = new PermanentCard(new AnabaShaman(owner,info),owner,testGame);
+//		ArrayList<Card> hand = new ArrayList<Card>();
+//		ArrayList<Card> hand2 = new ArrayList<Card>();
+//		//hand.add(testCard);
+//		hand.add(eagle);
+//		//hand.add(testPlains);
+//		lands.add(anabafield);
+//		testPlayer.updateRange(testGame);
+//		testPlayer2.updateRange(testGame);
+//		GameOptions testGameOptions = new GameOptions();
+//		testGameOptions.testMode = true;
+//		
+//		testGame.cheat(testPlayer.getId(),library(testPlayer.getId(),testGame), hand, lands, new ArrayList<Card>(), new ArrayList<Card>());
+//		
+//		
+//		testGame.cheat(testPlayer2.getId(),library(testPlayer2.getId(),testGame), hand2, lands2, new ArrayList<Card>(), new ArrayList<Card>());
+//		testGame.setGameOptions(testGameOptions);
+////		anabafield.removeSummoningSickness();
+//		System.out.println("eagle: "+eagle.getId());
+//		System.out.println(testPlayer.getHand());
+//		System.out.println("Playable: "+testPlayer.getPlayableOptions(testGame).size());
+//		System.out.println("Activate: ");
+////		testGame.startSim(testPlayer.getId());
+//		System.out.println("Playable: "+testPlayer2.getPlayableOptions(anabafield.getAbilities().get(0), testGame));
+////		System.out.println(testCard);
+//		
+//		System.out.println(testGame.getPhase());
+////		System.out.println(testGame.checkIfGameIsOver());
+//		testGame.start(owner);
+//		System.out.println("Players: "+testGame.getState().getPlayers());
+//		System.out.println("Mana left: "+testPlayer.getManaAvailable(testGame));
+//		System.out.println(testPlayer.activateAbility(eagle.getSpellAbility(), testGame));
+//		System.out.println("Mana left: "+testPlayer.getManaAvailable(testGame));
+//		System.out.println(testGame.getStack());
+////		System.out.println("Active: "+testGame.getState().getActivePlayerId());
+////		System.out.println(testGame.getState().getPlayerList().size());
+////		
+////		//testCard.playCard(testGame, Zone.HAND, Zone.BATTLEFIELD, owner);
+////		//		testPlayer.beginTurn(testGame);
+//////		//HumanPlayer h = new HumanPlayer();
+//		System.out.println(anabafield.isControlledBy(owner));
+//		System.out.println(anabafield.isPhasedIn());
+//		//anabafield.removeSummoningSickness();
+//		System.out.println(anabafield.wasControlledFromStartOfControllerTurn());
+//		System.out.println("tap: "+anabafield.isTapped());
+//
+//		System.out.println(testGame.getBattlefield());
+//		System.out.println(testGame.getBattlefield().getAllActivePermanents(testPlayer2.getId()));
 //		System.out.println(testPlayer2.getPlayableOptions(null, testGame));
 //		System.out.println(testGame.getStack());
 //		System.out.println(testPlayer.playCard(testCard, testGame, false, false, null));
@@ -161,33 +159,8 @@ public class TestMain {
 //		for(UUID abilityId : playable2.keySet()) {
 //			System.out.println(playable2.get(abilityId));
 //		}
-//		  // Creating object of Set
-//        Set<UUID> arrset1 = new HashSet<UUID>();
-//  
-//        // Populating arrset1
-//        arrset1.add(testPlayer.getId());
-//        arrset1.add(testPlayer2.getId());
-//  
-//        // print arrset1
-//        System.out.println("First Set: " + arrset1);
-//  
-//        // Creating another object of Set
-//        Set<UUID> arrset2 = new HashSet<UUID>();
-//  
-//        // Populating arrset2
-//        arrset2.add(testPlayer2.getId());
-//        arrset2.add(testPlayer.getId());
-//  
-//        // print arrset2
-//        System.out.println("Second Set: " + arrset2);
-//  
-//        // comparing first Set to another
-//        // using equals() method
-//        boolean value = arrset1.equals(arrset2);
-//  
-//        // print the value
-//        System.out.println("Are both set equal? "
-//                           + value);
+		
+		SpanningTree tree = new SpanningTree();
 	}
 	
 	private static ArrayList<PermanentCard> lands(int num,UUID ownerUuid,GameImpl game){

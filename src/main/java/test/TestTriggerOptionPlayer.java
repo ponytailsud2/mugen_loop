@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.UUID;
 
 import mage.MageObject;
 import mage.Mana;
@@ -19,11 +20,14 @@ import mage.abilities.mana.ActivatedManaAbilityImpl;
 import mage.abilities.mana.ManaAbility;
 import mage.abilities.mana.ManaOptions;
 import mage.cards.Card;
+import mage.constants.Outcome;
 import mage.constants.Zone;
 import mage.filter.common.FilterNonlandCard;
 import mage.game.Game;
 import mage.game.events.GameEvent;
 import mage.game.permanent.Permanent;
+import mage.target.Target;
+import mage.target.TargetPlayer;
 
 public class TestTriggerOptionPlayer extends TestTreePlayer {
 	
@@ -41,6 +45,15 @@ public class TestTriggerOptionPlayer extends TestTreePlayer {
 	public TestTriggerOptionPlayer(TestTreePlayer player) {
 		super(player);
 		// TODO Auto-generated constructor stub
+	}
+	
+	@Override
+	public boolean choose(Outcome outcome, Target target, UUID sourceId, Game game) {
+		// TODO Auto-generated method stub
+		if(target instanceof TargetPlayer) {
+			target.add(getId(), game);
+		}
+		return true;
 	}
 	
 	protected void findPlayables(Game game) {

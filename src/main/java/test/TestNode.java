@@ -13,7 +13,9 @@ import mage.MageObject;
 import mage.abilities.Ability;
 import mage.abilities.ActivatedAbility;
 import mage.abilities.Mode;
+import mage.abilities.SpecialAction;
 import mage.abilities.TriggeredAbility;
+import mage.abilities.common.PassAbility;
 import mage.game.ExileZone;
 import mage.game.Game;
 import mage.game.GameState;
@@ -24,6 +26,7 @@ import mage.player.ai.MCTSPlayer;
 import mage.players.Player;
 import mage.target.Target;
 import mage.util.ThreadLocalStringBuilder;
+import test.TestGame.CurrentAction;
 
 public class TestNode {
 	
@@ -32,6 +35,7 @@ public class TestNode {
 	private TestNode parent;
 	private final List<TestNode> children = new ArrayList<TestNode>();
 	private Ability action;
+	private StackObject stackEffect;
 	private Game game;
 	private final String stateValue;
 	private UUID playerId;
@@ -40,6 +44,7 @@ public class TestNode {
 	private int tappedPermanentCount = 0;
 	private int handCount = 0;
 	private int loopStepCount = 0;
+	private int level;
 	
 	//
 	private Stack<MageItem> availableTarget = new Stack<MageItem>();
@@ -51,6 +56,8 @@ public class TestNode {
 		this.playerId = playerId;
 		this.terminal = game.getPlayer(playerId).getPlayable(game, true).isEmpty();
 		this.parentStates = new ArrayList<String>();
+		this.level = 0;
+//		this.chooseUse = true;
 		// TODO Auto-generated constructor stub
 	}
 	
@@ -61,11 +68,23 @@ public class TestNode {
 		this.terminal = game.getPlayer(playerId).getPlayable(game, true).isEmpty();
 		this.parent = parent;
 		this.action = action;
-		
+		this.level = parent.level + 1;
 		this.parentStates = parent.parentStates;
 		this.parentStates.add(parent.getGameStateValue(parent.game));
 		// TODO Auto-generated constructor stub
 	}
+	
+	public TestNode(TestNode parent, Game game, StackObject effect) {
+		this.playerId = parent.playerId;
+		this.game = game;
+		this.stateValue = this.getGameStateValue(game);
+		this.parent = parent;
+		this.stackEffect = effect;
+		this.level = parent.level + 1;
+		this.parentStates = parent.parentStates;
+		this.parentStates.add(parent.getGameStateValue(parent.game));
+	}
+
 	
 	public String getGameStateValue(Game game) {
 		StringBuilder state = threadLocalBuilder.get();
@@ -112,11 +131,23 @@ public class TestNode {
 		return state.toString();
 	}
 	
+	
+	public int getLevel() {
+		return level;
+	}
+
+	public void setLevel(int level) {
+		this.level = level;
+	}
+
 	//expand
 	public void expand() {
 		TestTreePlayer player = (TestTreePlayer) game.getPlayer(playerId);
-		if(player.getNextAction() == null) {
+		if(isLoop()) {
 			
+		}
+		if(player.getNextAction() == null) {
+			return;
 		}
 		switch (player.getNextAction()) {
 		case PRIORITY:
@@ -125,11 +156,23 @@ public class TestNode {
 				abilities = player.getPlayableOptions(game);
 			else
 				abilities = getPlayables(player, stateValue, game);
+			if(!game.getStack().isEmpty()) {
+				abilities.add(new PassAbility());
+			}
 			for (Ability ability: abilities) {
+				System.out.println(ability);
 				Game sim = game.copy();
 //       	     logger.info("expand " + ability.toString());
 				TestTreePlayer simPlayer = (TestTreePlayer) sim.getPlayer(player.getId());
+				if(ability instanceof SpecialAction) {
+					ArrayList<CurrentAction> currentActions = ((TestGame)sim).getCurrentAction();
+					if(!currentActions.contains(CurrentAction.SPECIAL)) {
+						currentActions.add(CurrentAction.SPECIAL);
+					}
+					
+				}
 				simPlayer.activateAbility((ActivatedAbility)ability, sim);
+				
 				sim.resume();
 				children.add(new TestNode(this, sim, ability));
 			}
@@ -140,16 +183,42 @@ public class TestNode {
 				Game sim = game.copy();
 //       	     logger.info("expand " + ability.toString());
 				TestTreePlayer simPlayer = (TestTreePlayer) sim.getPlayer(player.getId());
+				//remove chosen triggered ability
 				sim.getState().removeTriggeredAbility(triggeredAbilities.get(ability));
+				//trigger the ability
 				simPlayer.triggerAbility((TriggeredAbility)ability, sim);
 				
 				sim.resume();
 				children.add(new TestNode(this, sim, ability));
 			}
 			break;
+		case CHOOSE_USE:
+			TestGame sim = (TestGame) game.copy();
+			ArrayList<CurrentAction> currentActions = ((TestGame)sim).getCurrentAction();
+			if(currentActions.contains(CurrentAction.RESOLVE)) {
+				//Case: replace event take place when resolving effect
+				if(currentActions.contains(CurrentAction.REPLACE)) {
+					
+				}
+				//Case: special action not resolve by stack
+				else if(currentActions.contains(CurrentAction.SPECIAL)){
+					
+				}
+				//Case: resolving ability by stack
+				else {
+					chooseUseResolveProcess(sim,player,true);
+					chooseUseResolveProcess(sim,player,false);
+				}
+			}
+			else if(currentActions.contains(CurrentAction.SPECIAL)) {
+				
+			}
+			break;
+		case CHOOSE_REPLACEMENT:
+			
+			break;
 		default:
 			break;
-        
 		}
 		game = null;
 	}
@@ -157,14 +226,28 @@ public class TestNode {
 	public void expandChoose(Ability source, Target availableTarget,Game game) {
 		List<? extends Target> targets = availableTarget.getTargetOptions(source, game);
 		
+		
+	}
+	
+	private void chooseUseResolveProcess(TestGame sim,Player player,boolean chooseUse) {
+		
+		TestTreePlayer simPlayer = (TestTreePlayer) sim.getPlayer(player.getId());
+		simPlayer.getChooseUseMap().put(this.level+1, chooseUse);
+		sim.resolve();
+		sim.resume();
+		children.add(new TestNode(this,sim,sim.getResolvingEffect()));
 	}
 	
 	//may use .getvalue to check if the state has passed but 
 	public boolean isLoop() {
 		//check same states
+		int loopCount = 0;
 		for(String state: this.parentStates) {
 			if(state.equals(this.stateValue)) {
-				return true;
+				loopCount++;
+				if(loopCount >= 5) {
+					return true;
+				}
 			}
 		}
 		//check infinite damage

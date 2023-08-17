@@ -1,6 +1,7 @@
 package test;
 
 import java.io.Serializable;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -10,6 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+
+
 import java.util.Map.Entry;
 
 import mage.ApprovingObject;
@@ -60,6 +63,7 @@ import mage.game.events.GameEvent;
 import mage.game.match.Match;
 import mage.game.permanent.Permanent;
 import mage.game.stack.StackAbility;
+import mage.game.stack.StackObject;
 import mage.game.tournament.Tournament;
 import mage.player.ai.ComputerPlayer;
 import mage.player.ai.MCTSPlayer.NextAction;
@@ -90,10 +94,20 @@ public class TestTreePlayer extends PlayerImpl{
    private NextAction nextAction;
    
    private transient ManaCost currentUnpaidMana;
-
+   
+   private int level;
+   
+   private StackObject resolvingAbility;
+   private int chooseUseRollBack = 0;
+   //{Level:answer for this Lv}
+   private HashMap<Integer,Boolean> chooseUseMap = new HashMap<Integer,Boolean>();
+   private HashMap<Integer,Integer> chooseReplacementMap = new HashMap<Integer,Integer>();
+   private SpanningTree tree;
+   
    public enum NextAction {
-       PRIORITY, TRIGGERED
+       PRIORITY, TRIGGERED, CHOOSE_USE, CHOOSE_REPLACEMENT, CHOOSE
    }
+   
 
    public TestTreePlayer(String name) {
 	   super(name,RangeOfInfluence.ALL);
@@ -104,60 +118,46 @@ public class TestTreePlayer extends PlayerImpl{
    
    public TestTreePlayer(final TestTreePlayer player) {
 	   super(player);
+	   this.tree = player.getTree();
+	   this.chooseUseMap = player.getChooseUseMap();
+	   this.chooseReplacementMap = player.getChooseReplacementMap();
    }
    
    @Override
    public boolean priority(Game game) {
+//	   if(game.getsta)
+	   
 	   game.pause();
        nextAction = NextAction.PRIORITY;
        return false;
    }
    
-   @Override
-   public boolean triggerAbility(TriggeredAbility source, Game game) {
-	   List<TriggeredAbility> triggeringAbilities = game.getState().getTriggered(playerId);
-//	   System.out.println(triggeringAbilities);
-	   game.pause();
-	   nextAction = NextAction.TRIGGERED;
-	   game.resume();
-	   return true;
-   }
    
-   protected List<ActivatedAbility> getPlayableAbilities(Game game) {
+   
+//   @Override
+//   public boolean triggerAbility(TriggeredAbility source, Game game) {
+//	   List<TriggeredAbility> triggeringAbilities = game.getState().getTriggered(playerId);
+////	   System.out.println(triggeringAbilities);
+//	   game.pause();
+//	   nextAction = NextAction.TRIGGERED;
+//	   game.resume();
+//	   return true;
+//   }
+   
+   public SpanningTree getTree() {
+	return tree;
+}
+
+public void setTree(SpanningTree tree) {
+	this.tree = tree;
+}
+
+protected List<ActivatedAbility> getPlayableAbilities(Game game) {
        List<ActivatedAbility> playables = getPlayable(game, true);
        playables.add(pass);
        return playables;
    }
    
-   public List<Ability> getTriggerPlayableOptions(Game game){
-	   List<Ability> all = new ArrayList<Ability>();
-	   List<TriggeredAbility> triggeringAbilities = game.getState().getTriggered(playerId);
-	   for(TriggeredAbility ability:triggeringAbilities) {
-		   List<Ability> options = game.getPlayer(playerId).getPlayableOptions(ability, game);
-		   if (options.isEmpty()) {
-               if (!ability.getManaCosts().getVariableCosts().isEmpty()) {
-                   simulateVariableCosts(ability, all, game);
-               }
-               else {
-                   all.add(ability);
-               }
-           }
-           else {
-               for (Ability option: options) {
-                   if (!ability.getManaCosts().getVariableCosts().isEmpty()) {
-                       simulateVariableCosts(option, all, game);
-                   }
-                   else {
-                       all.add(option);
-                   }
-               }
-           }
-	   }
-	   for(Ability a:all) {
-		   System.out.println("Triggering: "+a);
-	   }
-	   return all;
-   }
 
    public List<Ability> getPlayableOptions(Game game) {
        List<Ability> all = new ArrayList<Ability>();
@@ -337,7 +337,7 @@ public class TestTreePlayer extends PlayerImpl{
    @Override
    public boolean choose(Outcome outcome, Target target, UUID sourceId, Game game, Map<String, Serializable> options) {
 	   
-	   return false;
+	  return false;
 	   
    }
    
@@ -476,6 +476,28 @@ public class TestTreePlayer extends PlayerImpl{
 
        return false;
    }
+   
+   public boolean triggerAbility(TriggeredAbility source, Game game) {
+//     logger.info("trigger");
+     if (source != null && source.canChooseTarget(game, playerId)) {
+    
+         if (source.isUsesStack()) {
+             game.getStack().push(new StackAbility(source, playerId));
+             if (source.activate(game, false)) {
+                 game.fireEvent(new GameEvent(GameEvent.EventType.TRIGGERED_ABILITY, source.getId(), source, source.getControllerId()));
+                 
+                 return true;
+             }
+         } else {
+             if (source.activate(game, false)) {
+                 source.resolve(game);
+                 
+                 return true;
+             }
+         }
+     }
+     return false;
+ }
 
    protected boolean playManaHandling(Ability ability, ManaCost unpaid, final Game game) {
 //     log.info("paying for " + unpaid.getText());
@@ -662,6 +684,16 @@ public class TestTreePlayer extends PlayerImpl{
      return false;
  }
    
+   @Override
+   protected boolean specialAction(SpecialAction action, Game game) {
+	   
+	   return false;
+   }
+   
+   public void resetChoose() {
+	   
+   }
+   
 @Override
 public void abort() {
 	// TODO Auto-generated method stub
@@ -683,11 +715,19 @@ public Player copy() {
 @Override
 public boolean choose(Outcome outcome, Target target, UUID sourceId, Game game) {
 	// TODO Auto-generated method stub
-	return false;
+	
+	return true;
 }
 
 @Override
 public boolean choose(Outcome outcome, Cards cards, TargetCard target, Game game) {
+	// TODO Auto-generated method stub
+	
+	return true;
+}
+
+@Override
+public boolean choose(Outcome outcome, Choice choice, Game game) {
 	// TODO Auto-generated method stub
 	return false;
 }
@@ -701,6 +741,8 @@ public boolean chooseTarget(Outcome outcome, Target target, Ability source, Game
 @Override
 public boolean chooseTarget(Outcome outcome, Cards cards, TargetCard target, Ability source, Game game) {
 	// TODO Auto-generated method stub
+	List<Card> cardChoices = new ArrayList<>(cards.getCards(target.getFilter(), source != null ? source.getSourceId() : null, playerId, game));
+	
 	return false;
 }
 
@@ -718,34 +760,34 @@ public boolean chooseMulligan(Game game) {
 
 @Override
 public boolean chooseUse(Outcome outcome, String message, Ability source, Game game) {
-	// TODO Auto-generated method stub
-	return false;
+	return chooseUse(outcome,message,"",null,null,source,game);
 }
 
 @Override
 public boolean chooseUse(Outcome outcome, String message, String secondMessage, String trueText, String falseText,
 		Ability source, Game game) {
-	// TODO Auto-generated method stub
-	return false;
-}
-
-@Override
-public boolean choose(Outcome outcome, Choice choice, Game game) {
-	// TODO Auto-generated method stub
-	return false;
+	
+		if(chooseUseMap.containsKey(this.tree.getCurrent().getLevel())) {
+			return this.chooseUseMap.get(this.tree.getCurrent().getLevel());
+		}
+		//do expand process
+		game.pause();
+		this.nextAction = NextAction.CHOOSE_USE;
+		this.tree.chooseProcess();
+		
+		return false;
 }
 
 @Override
 public boolean choosePile(Outcome outcome, String message, List<? extends Card> pile1, List<? extends Card> pile2,
 		Game game) {
 	// TODO Auto-generated method stub
-	return false;
+	return chooseUse(outcome,message,"",null,null,null,game);
 }
 
 
 @Override
 public boolean playMana(Ability ability, ManaCost unpaid, String promptText, Game game) {
-	// TODO Auto-generated method stub
 	payManaMode = true;
     currentUnpaidMana = unpaid;
     try {
@@ -770,6 +812,11 @@ public int announceXCost(int min, int max, String message, Game game, Ability ab
 @Override
 public int chooseReplacementEffect(Map<String, String> abilityMap, Game game) {
 	// TODO Auto-generated method stub
+	int level = this.getTree().getCurrent().getLevel();
+	if(this.chooseReplacementMap.containsKey(level)) {
+		return this.chooseReplacementMap.get(level);
+	}
+	
 	return 0;
 }
 
@@ -846,7 +893,42 @@ public void pickCard(List<Card> cards, Deck deck, Draft draft) {
 	// TODO Auto-generated method stub
 	
 }
+  
 
-   
+public int getChooseUseRollBack() {
+	return chooseUseRollBack;
+}
+
+
+
+
+public HashMap<Integer, Boolean> getChooseUseMap() {
+	return chooseUseMap;
+}
+
+
+
+public void setChooseUseMap(HashMap<Integer, Boolean> chooseUseMap) {
+	this.chooseUseMap = chooseUseMap;
+}
+
+
+
+public StackObject getResolvingAbility() {
+	   return resolvingAbility;
+  }
+
+  public void setResolvingAbility(StackObject resolvingAbility) {
+	   this.resolvingAbility = resolvingAbility;
+  }
+
+public HashMap<Integer, Integer> getChooseReplacementMap() {
+	return chooseReplacementMap;
+}
+
+public void setChooseReplacementMap(HashMap<Integer, Integer> chooseReplacementMap) {
+	this.chooseReplacementMap = chooseReplacementMap;
+}
+
 
 }

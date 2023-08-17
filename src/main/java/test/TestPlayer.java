@@ -105,18 +105,18 @@ public class TestPlayer extends PlayerImpl {
 
 	public boolean chooseUse(Outcome outcome, String message, Ability source, Game game) {
 		// TODO Auto-generated method stub
-		return false;
+		return true;
 	}
 
 	public boolean chooseUse(Outcome outcome, String message, String secondMessage, String trueText, String falseText,
 			Ability source, Game game) {
 		// TODO Auto-generated method stub
-		return false;
+		return true;
 	}
 
 	public boolean choose(Outcome outcome, Choice choice, Game game) {
 		// TODO Auto-generated method stub
-		return false;
+		return true;
 	}
 
 	public boolean choosePile(Outcome outcome, String message, List<? extends Card> pile1, List<? extends Card> pile2,

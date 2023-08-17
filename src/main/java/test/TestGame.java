@@ -12,16 +12,20 @@ import mage.MageException;
 import mage.MageObject;
 import mage.abilities.Ability;
 import mage.abilities.TriggeredAbility;
+import mage.abilities.effects.ContinuousEffects;
 import mage.constants.MultiplayerAttackOption;
 import mage.constants.PhaseStep;
 import mage.constants.RangeOfInfluence;
+import mage.constants.Zone;
 import mage.game.Game;
 import mage.game.GameImpl;
 import mage.game.GameState;
 import mage.game.TwoPlayerDuelType;
+import mage.game.events.GameEvent;
 import mage.game.match.MatchType;
 import mage.game.mulligan.LondonMulligan;
 import mage.game.mulligan.Mulligan;
+import mage.game.stack.StackObject;
 import mage.game.turn.PreCombatMainPhase;
 import mage.game.turn.TurnMod;
 import mage.players.Player;
@@ -32,6 +36,17 @@ public class TestGame extends GameImpl{
 	private SpanningTree spanningTree;
 	private static final String UNIT_TESTS_ERROR_TEXT = "Error in unit tests";
 	private transient Stack<Integer> savedStates = new Stack<>();
+	private ContinuousEffects applyingReplaceEffects;
+	private TestGame resolvingEffectGame;
+	private StackObject resolvingEffect;
+	private ArrayList<CurrentAction> currentAction;
+	
+	public enum CurrentAction {
+	       RESOLVE,
+	       REPLACE,
+	       APPLY,
+	       SPECIAL
+	   }
 
 //	public TestGame(GameImpl game) {
 //		super(game);
@@ -45,6 +60,19 @@ public class TestGame extends GameImpl{
 		
 	}
 	
+	public ContinuousEffects getApplyingReplaceEffects() {
+		return applyingReplaceEffects;
+	}
+
+	public ArrayList<CurrentAction> getCurrentAction() {
+		return currentAction;
+	}
+
+
+	public void setApplyingReplaceEffects(ContinuousEffects applyingReplaceEffects) {
+		this.applyingReplaceEffects = applyingReplaceEffects;
+	}
+
 	public TestGame(final TestGame game) {
 		super(game);
 		this.spanningTree = game.spanningTree;
@@ -292,6 +320,66 @@ public class TestGame extends GameImpl{
         }
         return false;
     }
+	
+	@Override
+	public void resolve() {
+		if(!this.currentAction.contains(CurrentAction.RESOLVE)) {
+			this.currentAction.add(CurrentAction.RESOLVE);
+		}
+		
+        StackObject top = null;
+        try {
+            top = state.getStack().peek();
+            if(top.getControllerId()==spanningTree.getPlayer().getId()) {
+            	this.resolvingEffectGame = new TestGame(this);
+            	this.resolvingEffect = top;
+            	spanningTree.getPlayer().setResolvingAbility(top);
+            }
+            top.resolve(this);
+            resetControlAfterSpellResolve(top.getId());
+        } finally {
+            if (top != null) {
+                state.getStack().remove(top, this); // seems partly redundant because move card from stack to grave is already done and the stack removed
+                rememberLKI(top.getSourceId(), Zone.STACK, top);
+                checkInfiniteLoop(top.getSourceId());
+                if (!getTurn().isEndTurnRequested()) {
+                    while (state.hasSimultaneousEvents()) {
+                        state.handleSimultaneousEvent(this);
+                    }
+                }
+            }
+        }
+        this.currentAction.remove(CurrentAction.RESOLVE);
+    }
+	
+	@Override
+    public boolean replaceEvent(GameEvent event) {
+		if(!this.currentAction.contains(CurrentAction.REPLACE)) {
+			this.currentAction.add(CurrentAction.REPLACE);
+		}
+		
+		this.settingApplyingReplaceEvent(event, null);
+		boolean result = state.replaceEvent(event, this);
+		this.currentAction.remove(CurrentAction.REPLACE);
+		return result;
+    }
+
+    @Override
+    public boolean replaceEvent(GameEvent event, Ability targetAbility) {
+    	if(!this.currentAction.contains(CurrentAction.REPLACE)) {
+			this.currentAction.add(CurrentAction.REPLACE);
+		}
+    	this.settingApplyingReplaceEvent(event, targetAbility);
+    	boolean result = state.replaceEvent(event, this);
+		this.currentAction.remove(CurrentAction.REPLACE);
+		return result;
+    }
+    
+    private void settingApplyingReplaceEvent(GameEvent event,Ability targetAbility) {
+    	if(!this.getState().getContinuousEffects().preventedByRuleModification(event, targetAbility,this,false)) {
+    		this.applyingReplaceEffects = this.getState().getContinuousEffects();
+    	}
+    }
 
 	public MatchType getGameType() {
 		// TODO Auto-generated method stub
@@ -315,6 +403,15 @@ public class TestGame extends GameImpl{
 	public void setTriggeringOptions(HashMap<Ability, TriggeredAbility> triggeringOptions) {
 		this.triggeringOptions = triggeringOptions;
 	}
+
+	public StackObject getResolvingEffect() {
+		return resolvingEffect;
+	}
+
+	public void setResolvingEffect(StackObject resolvingEffect) {
+		this.resolvingEffect = resolvingEffect;
+	}
+	
 	
 
 }
