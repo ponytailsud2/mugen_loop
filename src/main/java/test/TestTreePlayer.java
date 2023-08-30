@@ -29,6 +29,7 @@ import mage.abilities.SpecialAction;
 import mage.abilities.SpellAbility;
 import mage.abilities.TriggeredAbility;
 import mage.abilities.common.PassAbility;
+import mage.abilities.costs.Cost;
 import mage.abilities.costs.VariableCost;
 import mage.abilities.costs.mana.ColoredManaCost;
 import mage.abilities.costs.mana.ColorlessManaCost;
@@ -168,6 +169,11 @@ protected List<ActivatedAbility> getPlayableAbilities(Game game) {
            for(Ability abOptions:game.getPlayer(playerId).getPlayableOptions(ability, game)) {
         	   for(Target target:abOptions.getAllSelectedTargets()) {
         		   System.out.println("target: "+ target.getFirstTarget());
+        	   }
+        	   for(Cost cost: abOptions.getCosts()) {
+        		   for(Target target:cost.getTargets()) {
+        			   System.out.println("cost target: " + target.getFirstTarget());
+        		   }
         	   }
            }
            if (options.isEmpty()) {
@@ -732,6 +738,7 @@ public boolean choose(Outcome outcome, Choice choice, Game game) {
 	return false;
 }
 
+//for sacrifice/
 @Override
 public boolean chooseTarget(Outcome outcome, Target target, Ability source, Game game) {
 	// TODO Auto-generated method stub
