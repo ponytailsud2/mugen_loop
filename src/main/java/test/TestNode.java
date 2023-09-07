@@ -144,7 +144,7 @@ public class TestNode {
 	public void expand() {
 		TestTreePlayer player = (TestTreePlayer) game.getPlayer(playerId);
 		if(isLoop()) {
-			
+			System.out.println("This combination has loop");
 		}
 		if(player.getNextAction() == null) {
 			return;

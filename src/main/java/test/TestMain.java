@@ -11,6 +11,7 @@ import mage.cards.Card;
 import mage.cards.CardSetInfo;
 import mage.cards.a.AbbeyMatron;
 import mage.cards.a.Abjure;
+import mage.cards.a.AccursedCentaur;
 import mage.cards.a.Aeolipile;
 import mage.cards.a.AnabaShaman;
 import mage.cards.a.AngelicPurge;
@@ -18,6 +19,7 @@ import mage.cards.b.BattleflightEagle;
 import mage.cards.basiclands.Island;
 import mage.cards.basiclands.Mountain;
 import mage.cards.basiclands.Plains;
+import mage.cards.basiclands.Swamp;
 import mage.cards.decks.Deck;
 import mage.cards.u.UndiscoveredParadise;
 import mage.constants.MultiplayerAttackOption;
@@ -44,7 +46,8 @@ public class TestMain {
 	
 	
 	public static void main(String[] args) {
-		//simulate game set up 
+		BasicConfigurator.configure();
+		//simulate game set up
 		TestTriggerOptionPlayer testPlayer = new TestTriggerOptionPlayer("test");
 		AlwaysPassPlayer testPlayer2 = new AlwaysPassPlayer(new UUID(1,1),"test2");
 		UUID owner = testPlayer.getId();
@@ -56,7 +59,7 @@ public class TestMain {
 		AnabaShaman testAnaba = new AnabaShaman(owner,info);
 		Plains testPlains = new Plains(owner,info);
 		
-		TwoPlayerDuel testGame = new TwoPlayerDuel(MultiplayerAttackOption.LEFT,RangeOfInfluence.ALL,new LondonMulligan(0),20,7);
+		TestResolveGame testGame = new TestResolveGame(MultiplayerAttackOption.LEFT,RangeOfInfluence.ALL,new LondonMulligan(0),20,7);
 		
 //		TestGame testGame = new TestGame(new SpanningTree(testPlayer));
 		testGame.setSimulation(false);
@@ -70,17 +73,17 @@ public class TestMain {
 		System.out.println(testGame.getPlayer(testPlayer2.getId()).getLibrary().size());
 		ArrayList<PermanentCard> lands = lands(6,owner,testGame);
 		ArrayList<PermanentCard> lands2 = lands(6,owner,testGame);
-		PermanentCard anabafield = new PermanentCard(new AnabaShaman(testPlayer2.getId(),info),testPlayer2.getId(),testGame);
+		PermanentCard anabafield = new PermanentCard(new AnabaShaman(owner,info),owner,testGame);
 		ArrayList<Card> hand = new ArrayList<Card>();
 		ArrayList<Card> hand2 = new ArrayList<Card>();
-		AngelicPurge test_sacrifice_card = new AngelicPurge(owner, info);
+		AccursedCentaur test_sacrifice_card = new AccursedCentaur(owner, info);
 		PermanentCard test_sacrifice = new PermanentCard(test_sacrifice_card,owner,testGame);		
 		//hand.add(testCard);
-		hand.add(test_sacrifice);
+		hand.add(test_sacrifice_card);
 //		hand.add(eagle);
 		//hand.add(testPlains);
 //		lands.add(anabafield);
-		lands2.add(anabafield);
+		lands.add(anabafield);
 		testPlayer.updateRange(testGame);
 		testPlayer2.updateRange(testGame);
 		GameOptions testGameOptions = new GameOptions();
@@ -118,9 +121,8 @@ public class TestMain {
 		System.out.println("anaba: "+anabafield.getId());
 		System.out.println(testPlayer.getHand());
 		System.out.println("Playable: "+testPlayer.getPlayableOptions(testGame));
-		System.out.println("Cost: " + testPlayer.getPlayableOptions(testGame).get(0).getCosts().getTargets().toString());
 //		testGame.startSim(testPlayer.getId());
-		System.out.println("Playable: "+testPlayer2.getPlayableOptions(anabafield.getAbilities().get(0), testGame));
+//		System.out.println("Playable: "+testPlayer2.getPlayableOptions(anabafield.getAbilities().get(0), testGame));
 //		System.out.println(testCard);
 //		System.out.println(testPlayer.activateAbility(eagle.getSpellAbility(), testGame));
 		System.out.println("Mana left: "+testPlayer.getManaAvailable(testGame));
@@ -136,7 +138,17 @@ public class TestMain {
 		//anabafield.removeSummoningSickness();
 		System.out.println(anabafield.wasControlledFromStartOfControllerTurn());
 		System.out.println("tap: "+anabafield.isTapped());
-
+		
+		//test cast
+		System.out.println(testPlayer.activateAbility((ActivatedAbility)testPlayer.getPlayableOptions(testGame).get(0), testGame)); 
+		System.out.println(testGame.getStack());
+		testGame.stackResolve();
+		System.out.println(testGame.getBattlefield().getAllActivePermanents(owner));
+		testGame.checkTriggeringAbility();
+		System.out.println(testGame.getStack());
+		testGame.stackResolve();
+		System.out.println(testGame.getBattlefield().getAllActivePermanents(owner));
+		System.out.println(testGame.getStack());
 //		System.out.println(testGame.getBattlefield());
 //		System.out.println(testGame.getBattlefield().getAllActivePermanents(testPlayer2.getId()));
 		
@@ -267,9 +279,10 @@ public class TestMain {
 		ArrayList<PermanentCard> paradises = new ArrayList<PermanentCard>();
 		CardSetInfo cardInfo = new CardSetInfo("","","",Rarity.COMMON);
 		while(paradises.size() < num) {
-			paradises.add(new PermanentCard(new Plains(ownerUuid, cardInfo),ownerUuid,game));
+//			paradises.add(new PermanentCard(new Plains(ownerUuid, cardInfo),ownerUuid,game));
 //			paradises.add(new PermanentCard(new Island(ownerUuid, cardInfo),ownerUuid,game));
 //			paradises.add(new PermanentCard(new Mountain(ownerUuid, cardInfo),ownerUuid,game));
+			paradises.add(new PermanentCard(new Swamp(ownerUuid, cardInfo),ownerUuid,game));
 //			paradises.add(new PermanentCard(new AnabaShaman(ownerUuid,cardInfo),ownerUuid,game));
 //			paradises.add(new PermanentCard(new UndiscoveredParadise(ownerUuid, cardInfo),ownerUuid,game));
 		}

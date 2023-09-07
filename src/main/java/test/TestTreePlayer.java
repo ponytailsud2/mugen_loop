@@ -77,9 +77,11 @@ import mage.target.Target;
 import mage.target.TargetAmount;
 import mage.target.TargetCard;
 import mage.target.TargetImpl;
+import mage.target.TargetPermanent;
 import mage.target.Targets;
 import mage.util.CardUtil;
 import mage.util.ManaUtil;
+import mage.util.MessageToClient;
 import mage.util.RandomUtil;
 
 
@@ -338,13 +340,6 @@ protected List<ActivatedAbility> getPlayableAbilities(Game game) {
            }
        }
        addBlocker(game, engagement, remaining, engagements);
-   }
-
-   @Override
-   public boolean choose(Outcome outcome, Target target, UUID sourceId, Game game, Map<String, Serializable> options) {
-	   
-	  return false;
-	   
    }
    
    public Target nextTarget(Ability source, Target availableTarget,Game game) {
@@ -719,12 +714,112 @@ public Player copy() {
 }
 
 @Override
+public boolean choose(Outcome outcome, Target target, UUID sourceId, Game game, Map<String, Serializable> options) {
+	 UUID abilityControllerId = playerId;
+	 MageObject object = game.getObject(sourceId);
+     if (object instanceof Ability) {
+
+		ArrayList<Target> targetOption =  (ArrayList<Target>) target.getTargetOptions((Ability)object, game);
+     }
+     if (target.getTargetController() != null
+             && target.getAbilityController() != null) {
+         abilityControllerId = target.getAbilityController();
+     }
+     if (options == null) {
+         options = new HashMap<>();
+     }
+		Set<UUID> targetIds = target.possibleTargets(sourceId, abilityControllerId, game);
+      
+	  if (targetIds == null || targetIds.isEmpty()) {
+          return target.getTargets().size() >= target.getNumberOfTargets();
+      }
+
+      boolean required = target.isRequired(sourceId, game);
+      if (target.getTargets().size() >= target.getNumberOfTargets()) {
+          required = false;
+      }
+
+      java.util.List<UUID> chosen = target.getTargets();
+//      options.put("chosen", (Serializable) chosen);
+//
+//      updateGameStatePriority("choose(5)", game);
+//      prepareForResponse(game);
+//      if (!isExecutingMacro()) {
+//          game.fireSelectTargetEvent(getId(), new MessageToClient(target.getMessage(), getRelatedObjectName(sourceId, game)), targetIds, required, getOptions(target, options));
+//      }
+//      waitForResponse(game);
+      
+      //span choice
+      UUID responseId = getFixedResponseUUID(game);
+      if (responseId != null) {
+          // selected some target
+
+          // remove selected
+          if (target.getTargets().contains(responseId)) {
+              target.remove(responseId);
+              continue;
+          }
+
+          if (!targetIds.contains(responseId)) {
+              continue;
+          }
+
+          if (target instanceof TargetPermanent) {
+              if (((TargetPermanent) target).canTarget(abilityControllerId, responseId, sourceId, game, false)) {
+                  target.add(responseId, game);
+                  if (target.doneChosing()) {
+                      return true;
+                  }
+              }
+          } else {
+              MageObject object = game.getObject(sourceId);
+              if (object instanceof Ability) {
+                  if (target.canTarget(responseId, (Ability) object, game)) {
+                      if (target.getTargets().contains(responseId)) { // if already included remove it with
+                          target.remove(responseId);
+                      } else {
+                          target.addTarget(responseId, (Ability) object, game);
+                          if (target.doneChosing()) {
+                              return true;
+                          }
+                      }
+                  }
+              } else if (target.canTarget(responseId, game)) {
+                  if (target.getTargets().contains(responseId)) { // if already included remove it with
+                      target.remove(responseId);
+                  } else {
+                      target.addTarget(responseId, null, game);
+                      if (target.doneChosing()) {
+                          return true;
+                      }
+                  }
+              }
+          }
+      } else {
+          // send other command like cancel or done (??sends other commands like concede??)
+
+          // auto-complete on all selected
+          if (target.getTargets().size() >= target.getNumberOfTargets()) {
+              return true;
+          }
+
+          // cancel/done button
+          if (!required) {
+              return false;
+          }
+      }
+	  return false;
+	   
+}
+
+@Override
 public boolean choose(Outcome outcome, Target target, UUID sourceId, Game game) {
 	// TODO Auto-generated method stub
 	
-	return true;
+	return choose(outcome, target, sourceId, game, null);
 }
 
+//cast card from outside the game, nivv mezzet reborn
 @Override
 public boolean choose(Outcome outcome, Cards cards, TargetCard target, Game game) {
 	// TODO Auto-generated method stub
@@ -745,6 +840,7 @@ public boolean chooseTarget(Outcome outcome, Target target, Ability source, Game
 	return false;
 }
 
+//use for discard
 @Override
 public boolean chooseTarget(Outcome outcome, Cards cards, TargetCard target, Ability source, Game game) {
 	// TODO Auto-generated method stub
@@ -769,7 +865,7 @@ public boolean chooseMulligan(Game game) {
 public boolean chooseUse(Outcome outcome, String message, Ability source, Game game) {
 	return chooseUse(outcome,message,"",null,null,source,game);
 }
-
+//abundance
 @Override
 public boolean chooseUse(Outcome outcome, String message, String secondMessage, String trueText, String falseText,
 		Ability source, Game game) {
