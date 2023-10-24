@@ -17,14 +17,12 @@ import mage.constants.MultiplayerAttackOption;
 import mage.constants.PhaseStep;
 import mage.constants.RangeOfInfluence;
 import mage.constants.Zone;
-import mage.game.Game;
 import mage.game.GameImpl;
 import mage.game.GameState;
 import mage.game.TwoPlayerDuelType;
 import mage.game.events.GameEvent;
 import mage.game.match.MatchType;
 import mage.game.mulligan.LondonMulligan;
-import mage.game.mulligan.Mulligan;
 import mage.game.stack.StackObject;
 import mage.game.turn.PreCombatMainPhase;
 import mage.game.turn.TurnMod;
@@ -40,6 +38,7 @@ public class TestGame extends GameImpl{
 	private TestGame resolvingEffectGame;
 	private StackObject resolvingEffect;
 	private ArrayList<CurrentAction> currentAction;
+	private int infiniteLoopCounter = 0;
 	
 	public enum CurrentAction {
 	       RESOLVE,

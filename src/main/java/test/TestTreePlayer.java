@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-
 import java.util.Map.Entry;
 
 import mage.ApprovingObject;
@@ -66,10 +65,6 @@ import mage.game.permanent.Permanent;
 import mage.game.stack.StackAbility;
 import mage.game.stack.StackObject;
 import mage.game.tournament.Tournament;
-import mage.player.ai.ComputerPlayer;
-import mage.player.ai.MCTSPlayer.NextAction;
-import mage.players.Library;
-import mage.players.ManaPool;
 import mage.players.ManaPoolItem;
 import mage.players.Player;
 import mage.players.PlayerImpl;
@@ -84,59 +79,55 @@ import mage.util.ManaUtil;
 import mage.util.MessageToClient;
 import mage.util.RandomUtil;
 
+public class TestTreePlayer extends PlayerImpl {
 
-public class TestTreePlayer extends PlayerImpl{
+	// private static final Logger logger = Logger.getLogger(MCTSPlayer.class);
 
+	protected PassAbility pass = new PassAbility();
 
-   //private static final Logger logger = Logger.getLogger(MCTSPlayer.class);
+	private static HashMap<UUID, List<Targets>> pastTarget = new HashMap<UUID, List<Targets>>();
 
-   protected PassAbility pass = new PassAbility();
-   
-   private static HashMap<UUID,List<Targets>> pastTarget = new HashMap<UUID,List<Targets>>();
+	private NextAction nextAction;
 
-   private NextAction nextAction;
-   
-   private transient ManaCost currentUnpaidMana;
-   
-   private int level;
-   
-   private StackObject resolvingAbility;
-   private int chooseUseRollBack = 0;
-   //{Level:answer for this Lv}
-   private HashMap<Integer,Boolean> chooseUseMap = new HashMap<Integer,Boolean>();
-   private HashMap<Integer,Integer> chooseReplacementMap = new HashMap<Integer,Integer>();
-   private SpanningTree tree;
-   
-   public enum NextAction {
-       PRIORITY, TRIGGERED, CHOOSE_USE, CHOOSE_REPLACEMENT, CHOOSE
-   }
-   
+	private transient ManaCost currentUnpaidMana;
 
-   public TestTreePlayer(String name) {
-	   super(name,RangeOfInfluence.ALL);
-       this.pass.setControllerId(this.getId());
-       human = false;
-       this.setTestMode(true);
-   }
-   
-   public TestTreePlayer(final TestTreePlayer player) {
-	   super(player);
-	   this.tree = player.getTree();
-	   this.chooseUseMap = player.getChooseUseMap();
-	   this.chooseReplacementMap = player.getChooseReplacementMap();
-   }
-   
-   @Override
-   public boolean priority(Game game) {
+	private int level;
+
+	private StackObject resolvingAbility;
+	private int chooseUseRollBack = 0;
+	// {Level:answer for this Lv}
+	private HashMap<Integer, Boolean> chooseUseMap = new HashMap<Integer, Boolean>();
+	private HashMap<Integer, Integer> chooseReplacementMap = new HashMap<Integer, Integer>();
+	private HashMap<Integer, Target> chooseCardsMap = new HashMap<Integer, Target>();
+	private SpanningTree tree;
+
+	public enum NextAction {
+		PRIORITY, TRIGGERED, CHOOSE_USE, CHOOSE_REPLACEMENT, CHOOSE
+	}
+
+	public TestTreePlayer(String name) {
+		super(name, RangeOfInfluence.ALL);
+		this.pass.setControllerId(this.getId());
+		human = false;
+		this.setTestMode(true);
+	}
+
+	public TestTreePlayer(final TestTreePlayer player) {
+		super(player);
+		this.tree = player.getTree();
+		this.chooseUseMap = player.getChooseUseMap();
+		this.chooseReplacementMap = player.getChooseReplacementMap();
+	}
+
+	@Override
+	public boolean priority(Game game) {
 //	   if(game.getsta)
-	   
-	   game.pause();
-       nextAction = NextAction.PRIORITY;
-       return false;
-   }
-   
-   
-   
+
+		game.pause();
+		nextAction = NextAction.PRIORITY;
+		return false;
+	}
+
 //   @Override
 //   public boolean triggerAbility(TriggeredAbility source, Game game) {
 //	   List<TriggeredAbility> triggeringAbilities = game.getState().getTriggered(playerId);
@@ -146,77 +137,73 @@ public class TestTreePlayer extends PlayerImpl{
 //	   game.resume();
 //	   return true;
 //   }
-   
-   public SpanningTree getTree() {
-	return tree;
-}
 
-public void setTree(SpanningTree tree) {
-	this.tree = tree;
-}
+	public SpanningTree getTree() {
+		return tree;
+	}
 
-protected List<ActivatedAbility> getPlayableAbilities(Game game) {
-       List<ActivatedAbility> playables = getPlayable(game, true);
-       playables.add(pass);
-       return playables;
-   }
-   
+	public void setTree(SpanningTree tree) {
+		this.tree = tree;
+	}
 
-   public List<Ability> getPlayableOptions(Game game) {
-       List<Ability> all = new ArrayList<Ability>();
-       List<ActivatedAbility> playables = getPlayableAbilities(game);
-       for (ActivatedAbility ability: playables) {
-           List<Ability> options = game.getPlayer(playerId).getPlayableOptions(ability, game);
+	protected List<ActivatedAbility> getPlayableAbilities(Game game) {
+		List<ActivatedAbility> playables = getPlayable(game, true);
+		playables.add(pass);
+		return playables;
+	}
+
+	public List<Ability> getPlayableOptions(Game game) {
+		List<Ability> all = new ArrayList<Ability>();
+		List<ActivatedAbility> playables = getPlayableAbilities(game);
+		for (ActivatedAbility ability : playables) {
+			List<Ability> options = game.getPlayer(playerId).getPlayableOptions(ability, game);
 //           System.out.println("Playable: |"+ability.getRule()+" | "+game.getPlayer(playerId).getPlayableOptions(ability, game));
-           for(Ability abOptions:game.getPlayer(playerId).getPlayableOptions(ability, game)) {
-        	   for(Target target:abOptions.getAllSelectedTargets()) {
-        		   System.out.println("target: "+ target.getFirstTarget());
-        	   }
-        	   for(Cost cost: abOptions.getCosts()) {
-        		   for(Target target:cost.getTargets()) {
-        			   System.out.println("cost target: " + target.getFirstTarget());
-        		   }
-        	   }
-           }
-           if (options.isEmpty()) {
-               if (!ability.getManaCosts().getVariableCosts().isEmpty()) {
-                   simulateVariableCosts(ability, all, game);
-               }
-               else {
-                   all.add(ability);
-               }
-           }
-           else {
-               for (Ability option: options) {
-                   if (!ability.getManaCosts().getVariableCosts().isEmpty()) {
-                       simulateVariableCosts(option, all, game);
-                   }
-                   else {
-                       all.add(option);
-                   }
-               }
-           }
-       }
-       return all;
-   }
+			for (Ability abOptions : game.getPlayer(playerId).getPlayableOptions(ability, game)) {
+				for (Target target : abOptions.getAllSelectedTargets()) {
+					System.out.println("target: " + target.getFirstTarget());
+				}
+				for (Cost cost : abOptions.getCosts()) {
+					for (Target target : cost.getTargets()) {
+						System.out.println("cost target: " + target.getFirstTarget());
+					}
+				}
+			}
+			if (options.isEmpty()) {
+				if (!ability.getManaCosts().getVariableCosts().isEmpty()) {
+					simulateVariableCosts(ability, all, game);
+				} else {
+					all.add(ability);
+				}
+			} else {
+				for (Ability option : options) {
+					if (!ability.getManaCosts().getVariableCosts().isEmpty()) {
+						simulateVariableCosts(option, all, game);
+					} else {
+						all.add(option);
+					}
+				}
+			}
+		}
+		return all;
+	}
 
-   protected void simulateVariableCosts(Ability ability, List<Ability> options, Game game) {
-       int numAvailable = getAvailableManaProducers(game).size() - ability.getManaCosts().manaValue();
-       int start = 0;
-       if (!(ability instanceof SpellAbility)) {
-           //only use x=0 on spell abilities
-           if (numAvailable == 0)
-               return;
-           else
-               start = 1;
-       }
-       for (int i = start; i < numAvailable; i++) {
-           Ability newAbility = ability.copy();
-           newAbility.getManaCostsToPay().add(new GenericManaCost(i));
-           options.add(newAbility);
-       }
-   }
-   
+	protected void simulateVariableCosts(Ability ability, List<Ability> options, Game game) {
+		int numAvailable = getAvailableManaProducers(game).size() - ability.getManaCosts().manaValue();
+		int start = 0;
+		if (!(ability instanceof SpellAbility)) {
+			// only use x=0 on spell abilities
+			if (numAvailable == 0)
+				return;
+			else
+				start = 1;
+		}
+		for (int i = start; i < numAvailable; i++) {
+			Ability newAbility = ability.copy();
+			newAbility.getManaCostsToPay().add(new GenericManaCost(i));
+			options.add(newAbility);
+		}
+	}
+
 //   @Override
 //   public boolean triggerAbility(TriggeredAbility source,Game game) {
 //	   if (source != null && source.canChooseTarget(game, playerId)) {
@@ -260,486 +247,506 @@ protected List<ActivatedAbility> getPlayableAbilities(Game game) {
 //       return false;
 //   }
 
-   public List<List<UUID>> getAttacks(Game game) {
-       List<List<UUID>> engagements = new ArrayList<List<UUID>>();
-       List<Permanent> attackersList = super.getAvailableAttackers(game);
-       //use binary digits to calculate powerset of attackers
-       int powerElements = (int) Math.pow(2, attackersList.size());
-       StringBuilder binary = new StringBuilder();
-       for (int i = powerElements - 1; i >= 0; i--) {
-           binary.setLength(0);
-           binary.append(Integer.toBinaryString(i));
-           while (binary.length() < attackersList.size()) {
-               binary.insert(0, '0');
-           }
-           List<UUID> engagement = new ArrayList<UUID>();
-           for (int j = 0; j < attackersList.size(); j++) {
-               if (binary.charAt(j) == '1') {
-                   engagement.add(attackersList.get(j).getId());
-               }
-           }
-           engagements.add(engagement);
-       }
-       return engagements;
-   }
+	public List<List<UUID>> getAttacks(Game game) {
+		List<List<UUID>> engagements = new ArrayList<List<UUID>>();
+		List<Permanent> attackersList = super.getAvailableAttackers(game);
+		// use binary digits to calculate powerset of attackers
+		int powerElements = (int) Math.pow(2, attackersList.size());
+		StringBuilder binary = new StringBuilder();
+		for (int i = powerElements - 1; i >= 0; i--) {
+			binary.setLength(0);
+			binary.append(Integer.toBinaryString(i));
+			while (binary.length() < attackersList.size()) {
+				binary.insert(0, '0');
+			}
+			List<UUID> engagement = new ArrayList<UUID>();
+			for (int j = 0; j < attackersList.size(); j++) {
+				if (binary.charAt(j) == '1') {
+					engagement.add(attackersList.get(j).getId());
+				}
+			}
+			engagements.add(engagement);
+		}
+		return engagements;
+	}
 
-   public List<List<List<UUID>>> getBlocks(Game game) {
-       List<List<List<UUID>>> engagements = new ArrayList<List<List<UUID>>>();
-       int numGroups = game.getCombat().getGroups().size();
-       if (numGroups == 0) {
-           return engagements;
-       }
+	public List<List<List<UUID>>> getBlocks(Game game) {
+		List<List<List<UUID>>> engagements = new ArrayList<List<List<UUID>>>();
+		int numGroups = game.getCombat().getGroups().size();
+		if (numGroups == 0) {
+			return engagements;
+		}
 
-       //add a node with no blockers
-       List<List<UUID>> engagement = new ArrayList<List<UUID>>();
-       for (int i = 0; i < numGroups; i++) {
-           engagement.add(new ArrayList<UUID>());
-       }
-       engagements.add(engagement);
+		// add a node with no blockers
+		List<List<UUID>> engagement = new ArrayList<List<UUID>>();
+		for (int i = 0; i < numGroups; i++) {
+			engagement.add(new ArrayList<UUID>());
+		}
+		engagements.add(engagement);
 
-       List<Permanent> blockers = getAvailableBlockers(game);
-       addBlocker(game, engagement, blockers, engagements);
+		List<Permanent> blockers = getAvailableBlockers(game);
+		addBlocker(game, engagement, blockers, engagements);
 
-       return engagements;
-   }
+		return engagements;
+	}
 
-   private List<List<UUID>> copyEngagement(List<List<UUID>> engagement) {
-       List<List<UUID>> newEngagement = new ArrayList<List<UUID>>();
-       for (List<UUID> group: engagement) {
-           newEngagement.add(new ArrayList<UUID>(group));
-       }
-       return newEngagement;
-   }
+	private List<List<UUID>> copyEngagement(List<List<UUID>> engagement) {
+		List<List<UUID>> newEngagement = new ArrayList<List<UUID>>();
+		for (List<UUID> group : engagement) {
+			newEngagement.add(new ArrayList<UUID>(group));
+		}
+		return newEngagement;
+	}
 
-   protected List<Permanent> remove(List<Permanent> source, Permanent element) {
-       List<Permanent> newList = new ArrayList<Permanent>();
-       for (Permanent permanent : source) {
-           if (!permanent.equals(element)) {
-               newList.add(permanent);
-           }
-       }
-       return newList;
-   }
-   
-   protected void addBlocker(Game game, List<List<UUID>> engagement, List<Permanent> blockers, List<List<List<UUID>>> engagements) {
-       if (blockers.isEmpty())
-           return;
-       int numGroups = game.getCombat().getGroups().size();
-       //try to block each attacker with each potential blocker
-       Permanent blocker = blockers.get(0);
+	protected List<Permanent> remove(List<Permanent> source, Permanent element) {
+		List<Permanent> newList = new ArrayList<Permanent>();
+		for (Permanent permanent : source) {
+			if (!permanent.equals(element)) {
+				newList.add(permanent);
+			}
+		}
+		return newList;
+	}
+
+	protected void addBlocker(Game game, List<List<UUID>> engagement, List<Permanent> blockers,
+			List<List<List<UUID>>> engagements) {
+		if (blockers.isEmpty())
+			return;
+		int numGroups = game.getCombat().getGroups().size();
+		// try to block each attacker with each potential blocker
+		Permanent blocker = blockers.get(0);
 //       if (logger.isDebugEnabled())
 //           logger.debug("simulating -- block:" + blocker);
-       List<Permanent> remaining = remove(blockers, blocker);
-       for (int i = 0; i < numGroups; i++) {
-           if (game.getCombat().getGroups().get(i).canBlock(blocker, game)) {
-               List<List<UUID>>newEngagement = copyEngagement(engagement);
-               newEngagement.get(i).add(blocker.getId());
-               engagements.add(newEngagement);
+		List<Permanent> remaining = remove(blockers, blocker);
+		for (int i = 0; i < numGroups; i++) {
+			if (game.getCombat().getGroups().get(i).canBlock(blocker, game)) {
+				List<List<UUID>> newEngagement = copyEngagement(engagement);
+				newEngagement.get(i).add(blocker.getId());
+				engagements.add(newEngagement);
 //                   logger.debug("simulating -- found redundant block combination");
-               addBlocker(game, newEngagement, remaining, engagements);  // and recurse minus the used blocker
-           }
-       }
-       addBlocker(game, engagement, remaining, engagements);
-   }
-   
-   public Target nextTarget(Ability source, Target availableTarget,Game game) {
-	   List<? extends Target> targets = availableTarget.getTargetOptions(source, game);
-	   return availableTarget;
-	  
-   }
-   
-   public NextAction getNextAction() {
-       return nextAction;
-   }
+				addBlocker(game, newEngagement, remaining, engagements); // and recurse minus the used blocker
+			}
+		}
+		addBlocker(game, engagement, remaining, engagements);
+	}
 
-   public void setNextAction(NextAction action) {
-       this.nextAction = action;
-   }
-   
-   private List<MageObject> getSortedProducers(ManaCosts<ManaCost> unpaid, Game game) {
-       List<MageObject> unsorted = this.getAvailableManaProducers(game);
-       unsorted.addAll(this.getAvailableManaProducersWithCost(game));
-       Map<MageObject, Integer> scored = new HashMap<>();
-       for (MageObject mageObject : unsorted) {
-           int score = 0;
-           for (ManaCost cost : unpaid) {
-               Abilities:
-               for (ActivatedManaAbilityImpl ability : mageObject.getAbilities().getAvailableActivatedManaAbilities(Zone.BATTLEFIELD, playerId, game)) {
-                   for (Mana netMana : ability.getNetMana(game)) {
-                       if (cost.testPay(netMana)) {
-                           score++;
-                           break Abilities;
-                       }
-                   }
-               }
-           }
-           if (score > 0) { // score mana producers that produce other mana types and have other uses higher
-               score += mageObject.getAbilities().getAvailableActivatedManaAbilities(Zone.BATTLEFIELD, playerId, game).size();
-               score += mageObject.getAbilities().getActivatedAbilities(Zone.BATTLEFIELD).size();
-               if (!mageObject.getCardType(game).contains(CardType.LAND)) {
-                   score += 2;
-               } else if (mageObject.getCardType(game).contains(CardType.CREATURE)) {
-                   score += 2;
-               }
-           }
-           scored.put(mageObject, score);
-       }
-       return sortByValue(scored);
-   }
-   
-   private List<MageObject> sortByValue(Map<MageObject, Integer> map) {
-       List<Entry<MageObject, Integer>> list = new LinkedList<>(map.entrySet());
-       Collections.sort(list, new Comparator<Entry<MageObject, Integer>>() {
-           @Override
-           public int compare(Entry<MageObject, Integer> o1, Entry<MageObject, Integer> o2) {
-               return (o1.getValue().compareTo(o2.getValue()));
-           }
-       });
-       List<MageObject> result = new ArrayList<>();
-       for (Entry<MageObject, Integer> entry : list) {
-           result.add(entry.getKey());
-       }
-       return result;
-   }
-   
-   private Abilities<ActivatedManaAbilityImpl> getManaAbilitiesSortedByManaCount(MageObject mageObject, final Game game) {
-       Abilities<ActivatedManaAbilityImpl> manaAbilities = mageObject.getAbilities().getAvailableActivatedManaAbilities(Zone.BATTLEFIELD, playerId, game);
-       if (manaAbilities.size() > 1) {
-           // Sort mana abilities by number of produced manas, to use ability first that produces most mana (maybe also conditional if possible)
-           Collections.sort(manaAbilities, new Comparator<ActivatedManaAbilityImpl>() {
-               @Override
-               public int compare(ActivatedManaAbilityImpl a1, ActivatedManaAbilityImpl a2) {
-                   int a1Max = 0;
-                   for (Mana netMana : a1.getNetMana(game)) {
-                       if (netMana.count() > a1Max) {
-                           a1Max = netMana.count();
-                       }
-                   }
-                   int a2Max = 0;
-                   for (Mana netMana : a2.getNetMana(game)) {
-                       if (netMana.count() > a2Max) {
-                           a2Max = netMana.count();
-                       }
-                   }
-                   return a2Max - a1Max;
-               }
-           });
-       }
-       return manaAbilities;
-   }
-   
-   boolean canUseAsThoughManaToPayManaCost(ManaCost checkCost, Ability abilityToPay, Mana manaOption, Ability manaAbility, MageObject manaProducer, Game game) {
-       // asThoughMana can change producing mana type, so you must check it here
-       // cause some effects adds additional checks in getAsThoughManaType (example: Draugr Necromancer with snow mana sources)
+	public Target nextTarget(Ability source, Target availableTarget, Game game) {
+		List<? extends Target> targets = availableTarget.getTargetOptions(source, game);
+		return availableTarget;
 
-       // simulate real asThoughMana usage
-       ManaPoolItem possiblePoolItem;
-       if (manaOption instanceof ConditionalMana) {
-           ConditionalMana conditionalNetMana = (ConditionalMana) manaOption;
-           possiblePoolItem = new ManaPoolItem(
-                   conditionalNetMana,
-                   manaAbility.getSourceObject(game),
-                   conditionalNetMana.getManaProducerOriginalId() != null ? conditionalNetMana.getManaProducerOriginalId() : manaAbility.getOriginalId()
-           );
-       } else {
-           possiblePoolItem = new ManaPoolItem(
-                   manaOption.getRed(),
-                   manaOption.getGreen(),
-                   manaOption.getBlue(),
-                   manaOption.getWhite(),
-                   manaOption.getBlack(),
-                   manaOption.getGeneric() + manaOption.getColorless(),
-                   manaProducer,
-                   manaAbility.getOriginalId(),
-                   manaOption.getFlag()
-           );
-       }
+	}
 
-       // cost can contains multiple mana types, must check each type (is it possible to pay a cost)
-       for (ManaType checkType : ManaUtil.getManaTypesInCost(checkCost)) {
-           // affected asThoughMana effect must fit a checkType with pool mana
-           ManaType possibleAsThoughPoolManaType = game.getContinuousEffects().asThoughMana(checkType, possiblePoolItem, abilityToPay.getSourceId(), abilityToPay, abilityToPay.getControllerId(), game);
-           if (possibleAsThoughPoolManaType == null) {
-               continue; // no affected asThough effects
-           }
-           boolean canPay;
-           if (possibleAsThoughPoolManaType == ManaType.COLORLESS) {
-               // colorless can be payed by any color from the pool
-               canPay = possiblePoolItem.count() > 0;
-           } else {
-               // colored must be payed by specific color from the pool (AsThough already changed it to fit with mana pool)
-               canPay = possiblePoolItem.get(possibleAsThoughPoolManaType) > 0;
-           }
-           if (canPay) {
-               return true;
-           }
-       }
+	public NextAction getNextAction() {
+		return nextAction;
+	}
 
-       return false;
-   }
-   
-   public boolean triggerAbility(TriggeredAbility source, Game game) {
+	public void setNextAction(NextAction action) {
+		this.nextAction = action;
+	}
+
+	private List<MageObject> getSortedProducers(ManaCosts<ManaCost> unpaid, Game game) {
+		List<MageObject> unsorted = this.getAvailableManaProducers(game);
+		unsorted.addAll(this.getAvailableManaProducersWithCost(game));
+		Map<MageObject, Integer> scored = new HashMap<>();
+		for (MageObject mageObject : unsorted) {
+			int score = 0;
+			for (ManaCost cost : unpaid) {
+				Abilities: for (ActivatedManaAbilityImpl ability : mageObject.getAbilities()
+						.getAvailableActivatedManaAbilities(Zone.BATTLEFIELD, playerId, game)) {
+					for (Mana netMana : ability.getNetMana(game)) {
+						if (cost.testPay(netMana)) {
+							score++;
+							break Abilities;
+						}
+					}
+				}
+			}
+			if (score > 0) { // score mana producers that produce other mana types and have other uses higher
+				score += mageObject.getAbilities().getAvailableActivatedManaAbilities(Zone.BATTLEFIELD, playerId, game)
+						.size();
+				score += mageObject.getAbilities().getActivatedAbilities(Zone.BATTLEFIELD).size();
+				if (!mageObject.getCardType(game).contains(CardType.LAND)) {
+					score += 2;
+				} else if (mageObject.getCardType(game).contains(CardType.CREATURE)) {
+					score += 2;
+				}
+			}
+			scored.put(mageObject, score);
+		}
+		return sortByValue(scored);
+	}
+
+	private List<MageObject> sortByValue(Map<MageObject, Integer> map) {
+		List<Entry<MageObject, Integer>> list = new LinkedList<>(map.entrySet());
+		Collections.sort(list, new Comparator<Entry<MageObject, Integer>>() {
+			@Override
+			public int compare(Entry<MageObject, Integer> o1, Entry<MageObject, Integer> o2) {
+				return (o1.getValue().compareTo(o2.getValue()));
+			}
+		});
+		List<MageObject> result = new ArrayList<>();
+		for (Entry<MageObject, Integer> entry : list) {
+			result.add(entry.getKey());
+		}
+		return result;
+	}
+
+	private Abilities<ActivatedManaAbilityImpl> getManaAbilitiesSortedByManaCount(MageObject mageObject,
+			final Game game) {
+		Abilities<ActivatedManaAbilityImpl> manaAbilities = mageObject.getAbilities()
+				.getAvailableActivatedManaAbilities(Zone.BATTLEFIELD, playerId, game);
+		if (manaAbilities.size() > 1) {
+			// Sort mana abilities by number of produced manas, to use ability first that
+			// produces most mana (maybe also conditional if possible)
+			Collections.sort(manaAbilities, new Comparator<ActivatedManaAbilityImpl>() {
+				@Override
+				public int compare(ActivatedManaAbilityImpl a1, ActivatedManaAbilityImpl a2) {
+					int a1Max = 0;
+					for (Mana netMana : a1.getNetMana(game)) {
+						if (netMana.count() > a1Max) {
+							a1Max = netMana.count();
+						}
+					}
+					int a2Max = 0;
+					for (Mana netMana : a2.getNetMana(game)) {
+						if (netMana.count() > a2Max) {
+							a2Max = netMana.count();
+						}
+					}
+					return a2Max - a1Max;
+				}
+			});
+		}
+		return manaAbilities;
+	}
+
+	boolean canUseAsThoughManaToPayManaCost(ManaCost checkCost, Ability abilityToPay, Mana manaOption,
+			Ability manaAbility, MageObject manaProducer, Game game) {
+		// asThoughMana can change producing mana type, so you must check it here
+		// cause some effects adds additional checks in getAsThoughManaType (example:
+		// Draugr Necromancer with snow mana sources)
+
+		// simulate real asThoughMana usage
+		ManaPoolItem possiblePoolItem;
+		if (manaOption instanceof ConditionalMana) {
+			ConditionalMana conditionalNetMana = (ConditionalMana) manaOption;
+			possiblePoolItem = new ManaPoolItem(conditionalNetMana, manaAbility.getSourceObject(game),
+					conditionalNetMana.getManaProducerOriginalId() != null
+							? conditionalNetMana.getManaProducerOriginalId()
+							: manaAbility.getOriginalId());
+		} else {
+			possiblePoolItem = new ManaPoolItem(manaOption.getRed(), manaOption.getGreen(), manaOption.getBlue(),
+					manaOption.getWhite(), manaOption.getBlack(), manaOption.getGeneric() + manaOption.getColorless(),
+					manaProducer, manaAbility.getOriginalId(), manaOption.getFlag());
+		}
+
+		// cost can contains multiple mana types, must check each type (is it possible
+		// to pay a cost)
+		for (ManaType checkType : ManaUtil.getManaTypesInCost(checkCost)) {
+			// affected asThoughMana effect must fit a checkType with pool mana
+			ManaType possibleAsThoughPoolManaType = game.getContinuousEffects().asThoughMana(checkType,
+					possiblePoolItem, abilityToPay.getSourceId(), abilityToPay, abilityToPay.getControllerId(), game);
+			if (possibleAsThoughPoolManaType == null) {
+				continue; // no affected asThough effects
+			}
+			boolean canPay;
+			if (possibleAsThoughPoolManaType == ManaType.COLORLESS) {
+				// colorless can be payed by any color from the pool
+				canPay = possiblePoolItem.count() > 0;
+			} else {
+				// colored must be payed by specific color from the pool (AsThough already
+				// changed it to fit with mana pool)
+				canPay = possiblePoolItem.get(possibleAsThoughPoolManaType) > 0;
+			}
+			if (canPay) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	public boolean triggerAbility(TriggeredAbility source, Game game) {
 //     logger.info("trigger");
-     if (source != null && source.canChooseTarget(game, playerId)) {
-    
-         if (source.isUsesStack()) {
-             game.getStack().push(new StackAbility(source, playerId));
-             if (source.activate(game, false)) {
-                 game.fireEvent(new GameEvent(GameEvent.EventType.TRIGGERED_ABILITY, source.getId(), source, source.getControllerId()));
-                 
-                 return true;
-             }
-         } else {
-             if (source.activate(game, false)) {
-                 source.resolve(game);
-                 
-                 return true;
-             }
-         }
-     }
-     return false;
- }
+		if (source != null && source.canChooseTarget(game, playerId)) {
 
-   protected boolean playManaHandling(Ability ability, ManaCost unpaid, final Game game) {
+			if (source.isUsesStack()) {
+				game.getStack().push(new StackAbility(source, playerId));
+				if (source.activate(game, false)) {
+					game.fireEvent(new GameEvent(GameEvent.EventType.TRIGGERED_ABILITY, source.getId(), source,
+							source.getControllerId()));
+
+					return true;
+				}
+			} else {
+				if (source.activate(game, false)) {
+					source.resolve(game);
+
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	protected boolean playManaHandling(Ability ability, ManaCost unpaid, final Game game) {
 //     log.info("paying for " + unpaid.getText());
-     ApprovingObject approvingObject = game.getContinuousEffects().asThough(ability.getSourceId(), AsThoughEffectType.SPEND_OTHER_MANA, ability, ability.getControllerId(), game);
-     ManaCost cost;
-     List<MageObject> producers;
-     if (unpaid instanceof ManaCosts) {
-         ManaCosts<ManaCost> manaCosts = (ManaCosts<ManaCost>) unpaid;
-         cost = manaCosts.get(manaCosts.size() - 1);
-         producers = getSortedProducers((ManaCosts) unpaid, game);
-     } else {
-         cost = unpaid;
-         producers = this.getAvailableManaProducers(game);
-         producers.addAll(this.getAvailableManaProducersWithCost(game));
-     }
-     for (MageObject mageObject : producers) {
-         // use color producing mana abilities with costs first that produce all color manas that are needed to pay
-         // otherwise the computer may not be able to pay the cost for that source
-         ManaAbility:
-         for (ActivatedManaAbilityImpl manaAbility : getManaAbilitiesSortedByManaCount(mageObject, game)) {
-             int colored = 0;
-             for (Mana mana : manaAbility.getNetMana(game)) {
-                 if (!unpaid.getMana().includesMana(mana)) {
-                     continue ManaAbility;
-                 }
-                 colored += mana.countColored();
-             }
-             if (colored > 1 && (cost instanceof ColoredManaCost)) {
-                 for (Mana netMana : manaAbility.getNetMana(game)) {
-                     if (cost.testPay(netMana)) {
-                         if (netMana instanceof ConditionalMana && !((ConditionalMana) netMana).apply(ability, game, getId(), cost)) {
-                             continue;
-                         }
-                         if (approvingObject != null && !canUseAsThoughManaToPayManaCost(cost, ability, netMana, manaAbility, mageObject, game)) {
-                             continue;
-                         }
-                         if (activateAbility(manaAbility, game)) {
-                             return true;
-                         }
-                     }
-                 }
-             }
-         }
-     }
+		ApprovingObject approvingObject = game.getContinuousEffects().asThough(ability.getSourceId(),
+				AsThoughEffectType.SPEND_OTHER_MANA, ability, ability.getControllerId(), game);
+		ManaCost cost;
+		List<MageObject> producers;
+		if (unpaid instanceof ManaCosts) {
+			ManaCosts<ManaCost> manaCosts = (ManaCosts<ManaCost>) unpaid;
+			cost = manaCosts.get(manaCosts.size() - 1);
+			producers = getSortedProducers((ManaCosts) unpaid, game);
+		} else {
+			cost = unpaid;
+			producers = this.getAvailableManaProducers(game);
+			producers.addAll(this.getAvailableManaProducersWithCost(game));
+		}
+		for (MageObject mageObject : producers) {
+			// use color producing mana abilities with costs first that produce all color
+			// manas that are needed to pay
+			// otherwise the computer may not be able to pay the cost for that source
+			ManaAbility: for (ActivatedManaAbilityImpl manaAbility : getManaAbilitiesSortedByManaCount(mageObject,
+					game)) {
+				int colored = 0;
+				for (Mana mana : manaAbility.getNetMana(game)) {
+					if (!unpaid.getMana().includesMana(mana)) {
+						continue ManaAbility;
+					}
+					colored += mana.countColored();
+				}
+				if (colored > 1 && (cost instanceof ColoredManaCost)) {
+					for (Mana netMana : manaAbility.getNetMana(game)) {
+						if (cost.testPay(netMana)) {
+							if (netMana instanceof ConditionalMana
+									&& !((ConditionalMana) netMana).apply(ability, game, getId(), cost)) {
+								continue;
+							}
+							if (approvingObject != null && !canUseAsThoughManaToPayManaCost(cost, ability, netMana,
+									manaAbility, mageObject, game)) {
+								continue;
+							}
+							if (activateAbility(manaAbility, game)) {
+								return true;
+							}
+						}
+					}
+				}
+			}
+		}
 
-     for (MageObject mageObject : producers) {
-         // pay all colored costs first
-         for (ActivatedManaAbilityImpl manaAbility : getManaAbilitiesSortedByManaCount(mageObject, game)) {
-             if (cost instanceof ColoredManaCost) {
-                 for (Mana netMana : manaAbility.getNetMana(game)) {
-                     if (cost.testPay(netMana) || approvingObject != null) {
-                         if (netMana instanceof ConditionalMana && !((ConditionalMana) netMana).apply(ability, game, getId(), cost)) {
-                             continue;
-                         }
-                         if (approvingObject != null && !canUseAsThoughManaToPayManaCost(cost, ability, netMana, manaAbility, mageObject, game)) {
-                             continue;
-                         }
-                         if (activateAbility(manaAbility, game)) {
-                             return true;
-                         }
-                     }
-                 }
-             }
-         }
-         // pay snow covered mana
-         for (ActivatedManaAbilityImpl manaAbility : getManaAbilitiesSortedByManaCount(mageObject, game)) {
-             if (cost instanceof SnowManaCost) {
-                 for (Mana netMana : manaAbility.getNetMana(game)) {
-                     if (cost.testPay(netMana) || approvingObject != null) {
-                         if (netMana instanceof ConditionalMana && !((ConditionalMana) netMana).apply(ability, game, getId(), cost)) {
-                             continue;
-                         }
-                         if (approvingObject != null && !canUseAsThoughManaToPayManaCost(cost, ability, netMana, manaAbility, mageObject, game)) {
-                             continue;
-                         }
-                         if (activateAbility(manaAbility, game)) {
-                             return true;
-                         }
-                     }
-                 }
-             }
-         }
-         // then pay hybrid
-         for (ActivatedManaAbilityImpl manaAbility : getManaAbilitiesSortedByManaCount(mageObject, game)) {
-             if (cost instanceof HybridManaCost) {
-                 for (Mana netMana : manaAbility.getNetMana(game)) {
-                     if (cost.testPay(netMana) || approvingObject != null) {
-                         if (netMana instanceof ConditionalMana && !((ConditionalMana) netMana).apply(ability, game, getId(), cost)) {
-                             continue;
-                         }
-                         if (approvingObject != null && !canUseAsThoughManaToPayManaCost(cost, ability, netMana, manaAbility, mageObject, game)) {
-                             continue;
-                         }
-                         if (activateAbility(manaAbility, game)) {
-                             return true;
-                         }
-                     }
-                 }
-             }
-         }
-         // then pay mono hybrid
-         for (ActivatedManaAbilityImpl manaAbility : getManaAbilitiesSortedByManaCount(mageObject, game)) {
-             if (cost instanceof MonoHybridManaCost) {
-                 for (Mana netMana : manaAbility.getNetMana(game)) {
-                     if (cost.testPay(netMana) || approvingObject != null) {
-                         if (netMana instanceof ConditionalMana && !((ConditionalMana) netMana).apply(ability, game, getId(), cost)) {
-                             continue;
-                         }
-                         if (approvingObject != null && !canUseAsThoughManaToPayManaCost(cost, ability, netMana, manaAbility, mageObject, game)) {
-                             continue;
-                         }
-                         if (activateAbility(manaAbility, game)) {
-                             return true;
-                         }
-                     }
-                 }
-             }
-         }
-         // pay colorless
-         for (ActivatedManaAbilityImpl manaAbility : getManaAbilitiesSortedByManaCount(mageObject, game)) {
-             if (cost instanceof ColorlessManaCost) {
-                 for (Mana netMana : manaAbility.getNetMana(game)) {
-                     if (cost.testPay(netMana) || approvingObject != null) {
-                         if (netMana instanceof ConditionalMana && !((ConditionalMana) netMana).apply(ability, game, getId(), cost)) {
-                             continue;
-                         }
-                         if (approvingObject != null && !canUseAsThoughManaToPayManaCost(cost, ability, netMana, manaAbility, mageObject, game)) {
-                             continue;
-                         }
-                         if (activateAbility(manaAbility, game)) {
-                             return true;
-                         }
-                     }
-                 }
-             }
-         }
-         // finally pay generic
-         for (ActivatedManaAbilityImpl manaAbility : getManaAbilitiesSortedByManaCount(mageObject, game)) {
-             if (cost instanceof GenericManaCost) {
-                 for (Mana netMana : manaAbility.getNetMana(game)) {
-                     if (cost.testPay(netMana) || approvingObject != null) {
-                         if (netMana instanceof ConditionalMana && !((ConditionalMana) netMana).apply(ability, game, getId(), cost)) {
-                             continue;
-                         }
-                         if (approvingObject != null && !canUseAsThoughManaToPayManaCost(cost, ability, netMana, manaAbility, mageObject, game)) {
-                             continue;
-                         }
-                         if (activateAbility(manaAbility, game)) {
-                             return true;
-                         }
-                     }
-                 }
-             }
-         }
-     }
+		for (MageObject mageObject : producers) {
+			// pay all colored costs first
+			for (ActivatedManaAbilityImpl manaAbility : getManaAbilitiesSortedByManaCount(mageObject, game)) {
+				if (cost instanceof ColoredManaCost) {
+					for (Mana netMana : manaAbility.getNetMana(game)) {
+						if (cost.testPay(netMana) || approvingObject != null) {
+							if (netMana instanceof ConditionalMana
+									&& !((ConditionalMana) netMana).apply(ability, game, getId(), cost)) {
+								continue;
+							}
+							if (approvingObject != null && !canUseAsThoughManaToPayManaCost(cost, ability, netMana,
+									manaAbility, mageObject, game)) {
+								continue;
+							}
+							if (activateAbility(manaAbility, game)) {
+								return true;
+							}
+						}
+					}
+				}
+			}
+			// pay snow covered mana
+			for (ActivatedManaAbilityImpl manaAbility : getManaAbilitiesSortedByManaCount(mageObject, game)) {
+				if (cost instanceof SnowManaCost) {
+					for (Mana netMana : manaAbility.getNetMana(game)) {
+						if (cost.testPay(netMana) || approvingObject != null) {
+							if (netMana instanceof ConditionalMana
+									&& !((ConditionalMana) netMana).apply(ability, game, getId(), cost)) {
+								continue;
+							}
+							if (approvingObject != null && !canUseAsThoughManaToPayManaCost(cost, ability, netMana,
+									manaAbility, mageObject, game)) {
+								continue;
+							}
+							if (activateAbility(manaAbility, game)) {
+								return true;
+							}
+						}
+					}
+				}
+			}
+			// then pay hybrid
+			for (ActivatedManaAbilityImpl manaAbility : getManaAbilitiesSortedByManaCount(mageObject, game)) {
+				if (cost instanceof HybridManaCost) {
+					for (Mana netMana : manaAbility.getNetMana(game)) {
+						if (cost.testPay(netMana) || approvingObject != null) {
+							if (netMana instanceof ConditionalMana
+									&& !((ConditionalMana) netMana).apply(ability, game, getId(), cost)) {
+								continue;
+							}
+							if (approvingObject != null && !canUseAsThoughManaToPayManaCost(cost, ability, netMana,
+									manaAbility, mageObject, game)) {
+								continue;
+							}
+							if (activateAbility(manaAbility, game)) {
+								return true;
+							}
+						}
+					}
+				}
+			}
+			// then pay mono hybrid
+			for (ActivatedManaAbilityImpl manaAbility : getManaAbilitiesSortedByManaCount(mageObject, game)) {
+				if (cost instanceof MonoHybridManaCost) {
+					for (Mana netMana : manaAbility.getNetMana(game)) {
+						if (cost.testPay(netMana) || approvingObject != null) {
+							if (netMana instanceof ConditionalMana
+									&& !((ConditionalMana) netMana).apply(ability, game, getId(), cost)) {
+								continue;
+							}
+							if (approvingObject != null && !canUseAsThoughManaToPayManaCost(cost, ability, netMana,
+									manaAbility, mageObject, game)) {
+								continue;
+							}
+							if (activateAbility(manaAbility, game)) {
+								return true;
+							}
+						}
+					}
+				}
+			}
+			// pay colorless
+			for (ActivatedManaAbilityImpl manaAbility : getManaAbilitiesSortedByManaCount(mageObject, game)) {
+				if (cost instanceof ColorlessManaCost) {
+					for (Mana netMana : manaAbility.getNetMana(game)) {
+						if (cost.testPay(netMana) || approvingObject != null) {
+							if (netMana instanceof ConditionalMana
+									&& !((ConditionalMana) netMana).apply(ability, game, getId(), cost)) {
+								continue;
+							}
+							if (approvingObject != null && !canUseAsThoughManaToPayManaCost(cost, ability, netMana,
+									manaAbility, mageObject, game)) {
+								continue;
+							}
+							if (activateAbility(manaAbility, game)) {
+								return true;
+							}
+						}
+					}
+				}
+			}
+			// finally pay generic
+			for (ActivatedManaAbilityImpl manaAbility : getManaAbilitiesSortedByManaCount(mageObject, game)) {
+				if (cost instanceof GenericManaCost) {
+					for (Mana netMana : manaAbility.getNetMana(game)) {
+						if (cost.testPay(netMana) || approvingObject != null) {
+							if (netMana instanceof ConditionalMana
+									&& !((ConditionalMana) netMana).apply(ability, game, getId(), cost)) {
+								continue;
+							}
+							if (approvingObject != null && !canUseAsThoughManaToPayManaCost(cost, ability, netMana,
+									manaAbility, mageObject, game)) {
+								continue;
+							}
+							if (activateAbility(manaAbility, game)) {
+								return true;
+							}
+						}
+					}
+				}
+			}
+		}
 
-     // pay phyrexian life costs
-     if (cost instanceof PhyrexianManaCost) {
-         return cost.pay(ability, game, ability, playerId, false, null) || approvingObject != null;
-     }
+		// pay phyrexian life costs
+		if (cost instanceof PhyrexianManaCost) {
+			return cost.pay(ability, game, ability, playerId, false, null) || approvingObject != null;
+		}
 
-     // pay special mana like convoke cost (tap for pay)
-     // GUI: user see "special" button while pay spell's cost
-     // TODO: AI can't prioritize special mana types to pay, e.g. it will use first available
-     SpecialAction specialAction = game.getState().getSpecialActions().getControlledBy(this.getId(), true)
-             .values().stream().findFirst().orElse(null);
-     ManaOptions specialMana = specialAction == null ? null : specialAction.getManaOptions(ability, game, unpaid);
-     if (specialMana != null) {
-         for (Mana netMana : specialMana) {
-             if (cost.testPay(netMana) || approvingObject != null) {
-                 if (netMana instanceof ConditionalMana && !((ConditionalMana) netMana).apply(ability, game, getId(), cost)) {
-                     continue;
-                 }
-                 specialAction.setUnpaidMana(unpaid);
-                 if (activateAbility(specialAction, game)) {
-                     return true;
-                 }
-                 // only one time try to pay
-                 break;
-             }
-         }
-     }
+		// pay special mana like convoke cost (tap for pay)
+		// GUI: user see "special" button while pay spell's cost
+		// TODO: AI can't prioritize special mana types to pay, e.g. it will use first
+		// available
+		SpecialAction specialAction = game.getState().getSpecialActions().getControlledBy(this.getId(), true).values()
+				.stream().findFirst().orElse(null);
+		ManaOptions specialMana = specialAction == null ? null : specialAction.getManaOptions(ability, game, unpaid);
+		if (specialMana != null) {
+			for (Mana netMana : specialMana) {
+				if (cost.testPay(netMana) || approvingObject != null) {
+					if (netMana instanceof ConditionalMana
+							&& !((ConditionalMana) netMana).apply(ability, game, getId(), cost)) {
+						continue;
+					}
+					specialAction.setUnpaidMana(unpaid);
+					if (activateAbility(specialAction, game)) {
+						return true;
+					}
+					// only one time try to pay
+					break;
+				}
+			}
+		}
 
-     return false;
- }
-   
-   @Override
-   protected boolean specialAction(SpecialAction action, Game game) {
-	   
-	   return false;
-   }
-   
-   public void resetChoose() {
-	   
-   }
-   
-@Override
-public void abort() {
-	// TODO Auto-generated method stub
-	abort = true;
-}
+		return false;
+	}
 
-@Override
-public void skip() {
-	// TODO Auto-generated method stub
-	
-}
+	@Override
+	protected boolean specialAction(SpecialAction action, Game game) {
 
-@Override
-public Player copy() {
-	// TODO Auto-generated method stub
-	return new TestTreePlayer(this);
-}
+		return false;
+	}
 
-@Override
-public boolean choose(Outcome outcome, Target target, UUID sourceId, Game game, Map<String, Serializable> options) {
-	 UUID abilityControllerId = playerId;
-	 MageObject object = game.getObject(sourceId);
-     if (object instanceof Ability) {
+	public void resetChoose() {
 
-		ArrayList<Target> targetOption =  (ArrayList<Target>) target.getTargetOptions((Ability)object, game);
-     }
-     if (target.getTargetController() != null
-             && target.getAbilityController() != null) {
-         abilityControllerId = target.getAbilityController();
-     }
-     if (options == null) {
-         options = new HashMap<>();
-     }
+	}
+
+	@Override
+	public void abort() {
+		// TODO Auto-generated method stub
+		abort = true;
+	}
+
+	@Override
+	public void skip() {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public Player copy() {
+		// TODO Auto-generated method stub
+		return new TestTreePlayer(this);
+	}
+
+	@Override
+	public boolean choose(Outcome outcome, Target target, UUID sourceId, Game game, Map<String, Serializable> options) {
+		UUID abilityControllerId = playerId;
+		MageObject object = game.getObject(sourceId);
+		if (object instanceof Ability) {
+
+			ArrayList<Target> targetOption = (ArrayList<Target>) target.getTargetOptions((Ability) object, game);
+
+		}
+		if (target.getTargetController() != null && target.getAbilityController() != null) {
+			abilityControllerId = target.getAbilityController();
+		}
+		if (options == null) {
+			options = new HashMap<>();
+		}
 		Set<UUID> targetIds = target.possibleTargets(sourceId, abilityControllerId, game);
-      
-	  if (targetIds == null || targetIds.isEmpty()) {
-          return target.getTargets().size() >= target.getNumberOfTargets();
-      }
 
-      boolean required = target.isRequired(sourceId, game);
-      if (target.getTargets().size() >= target.getNumberOfTargets()) {
-          required = false;
-      }
+		if (targetIds == null || targetIds.isEmpty()) {
+			return target.getTargets().size() >= target.getNumberOfTargets();
+		}
 
-      java.util.List<UUID> chosen = target.getTargets();
+		boolean required = target.isRequired(sourceId, game);
+		if (target.getTargets().size() >= target.getNumberOfTargets()) {
+			required = false;
+		}
+
+		java.util.List<UUID> chosen = target.getTargets();
 //      options.put("chosen", (Serializable) chosen);
 //
 //      updateGameStatePriority("choose(5)", game);
@@ -748,290 +755,356 @@ public boolean choose(Outcome outcome, Target target, UUID sourceId, Game game, 
 //          game.fireSelectTargetEvent(getId(), new MessageToClient(target.getMessage(), getRelatedObjectName(sourceId, game)), targetIds, required, getOptions(target, options));
 //      }
 //      waitForResponse(game);
-      
-      //span choice
-      UUID responseId = getFixedResponseUUID(game);
-      if (responseId != null) {
-          // selected some target
 
-          // remove selected
-          if (target.getTargets().contains(responseId)) {
-              target.remove(responseId);
-              continue;
-          }
+		// span choice
+//		UUID responseId = getFixedResponseUUID(game);
+//		if (responseId != null) {
+//			// selected some target
+//
+//			// remove selected
+//			if (target.getTargets().contains(responseId)) {
+//				target.remove(responseId);
+//				continue;
+//			}
+//
+//			if (!targetIds.contains(responseId)) {
+//				continue;
+//			}
+//
+//			if (target instanceof TargetPermanent) {
+//				if (((TargetPermanent) target).canTarget(abilityControllerId, responseId, sourceId, game, false)) {
+//					target.add(responseId, game);
+//					if (target.doneChosing()) {
+//						return true;
+//					}
+//				}
+//			} else {
+//				MageObject object = game.getObject(sourceId);
+//				if (object instanceof Ability) {
+//					if (target.canTarget(responseId, (Ability) object, game)) {
+//						if (target.getTargets().contains(responseId)) { // if already included remove it with
+//							target.remove(responseId);
+//						} else {
+//							target.addTarget(responseId, (Ability) object, game);
+//							if (target.doneChosing()) {
+//								return true;
+//							}
+//						}
+//					}
+//				} else if (target.canTarget(responseId, game)) {
+//					if (target.getTargets().contains(responseId)) { // if already included remove it with
+//						target.remove(responseId);
+//					} else {
+//						target.addTarget(responseId, null, game);
+//						if (target.doneChosing()) {
+//							return true;
+//						}
+//					}
+//				}
+//			}
+//		} else {
+//			// send other command like cancel or done (??sends other commands like
+//			// concede??)
+//
+//			// auto-complete on all selected
+//			if (target.getTargets().size() >= target.getNumberOfTargets()) {
+//				return true;
+//			}
+//
+//			// cancel/done button
+//			if (!required) {
+//				return false;
+//			}
+//		}
+		return false;
 
-          if (!targetIds.contains(responseId)) {
-              continue;
-          }
+	}
+//choose opponent/player/copy
+//enter btf under control of opponent of choice
+//meld/populate/soulbond
+//target.choose
+//aura swap
+//all players sacrifice creature
+	@Override
+	public boolean choose(Outcome outcome, Target target, UUID sourceId, Game game) {
+		// TODO Auto-generated method stub
 
-          if (target instanceof TargetPermanent) {
-              if (((TargetPermanent) target).canTarget(abilityControllerId, responseId, sourceId, game, false)) {
-                  target.add(responseId, game);
-                  if (target.doneChosing()) {
-                      return true;
-                  }
-              }
-          } else {
-              MageObject object = game.getObject(sourceId);
-              if (object instanceof Ability) {
-                  if (target.canTarget(responseId, (Ability) object, game)) {
-                      if (target.getTargets().contains(responseId)) { // if already included remove it with
-                          target.remove(responseId);
-                      } else {
-                          target.addTarget(responseId, (Ability) object, game);
-                          if (target.doneChosing()) {
-                              return true;
-                          }
-                      }
-                  }
-              } else if (target.canTarget(responseId, game)) {
-                  if (target.getTargets().contains(responseId)) { // if already included remove it with
-                      target.remove(responseId);
-                  } else {
-                      target.addTarget(responseId, null, game);
-                      if (target.doneChosing()) {
-                          return true;
-                      }
-                  }
-              }
-          }
-      } else {
-          // send other command like cancel or done (??sends other commands like concede??)
-
-          // auto-complete on all selected
-          if (target.getTargets().size() >= target.getNumberOfTargets()) {
-              return true;
-          }
-
-          // cancel/done button
-          if (!required) {
-              return false;
-          }
-      }
-	  return false;
-	   
-}
-
-@Override
-public boolean choose(Outcome outcome, Target target, UUID sourceId, Game game) {
-	// TODO Auto-generated method stub
-	
-	return choose(outcome, target, sourceId, game, null);
-}
-
-//cast card from outside the game, nivv mezzet reborn
+		return choose(outcome, target, sourceId, game, null);
+	}
+//hide away/ripple
+//search
+//cast card from outside the game, nivv mezzet reborn/draw discard one of them
+//exile card you choose/look at library and pick
+//cards = cardpool, target = chosen cards(can be more than 1)
 @Override
 public boolean choose(Outcome outcome, Cards cards, TargetCard target, Game game) {
 	// TODO Auto-generated method stub
-	
+	if (cards == null || cards.isEmpty()) {
+        return false;
+    }
+	UUID abilityControllerId = playerId;
+	if (target.getTargetController() != null
+            && target.getAbilityController() != null) {
+        abilityControllerId = target.getAbilityController();
+    }
+	boolean required = target.isRequired(null, game);
+    int count = cards.count(target.getFilter(), abilityControllerId, game);
+    if (count == 0
+            || target.getTargets().size() >= target.getNumberOfTargets()) {
+        required = false;
+    }
+    java.util.List<UUID> choosable = new ArrayList<>();
+    for (UUID cardId : cards) {
+        if (target.canTarget(abilityControllerId, cardId, null, cards, game)) {
+            choosable.add(cardId);
+        }
+    }
+    boolean check_if_there_is_min = false;
+	ArrayList<TargetCard> target_card_array = new ArrayList<TargetCard>();
+    for (int n = target.getMinNumberOfTargets();n<=target.getMaxNumberOfTargets();n++) {
+    	
+    	if(n <= cards.size()) {
+			if(check_if_there_is_min) {
+				continue;
+			}else {
+				TargetCard target_temp = new TargetCard(target);
+				for (UUID card :cards){
+					target_temp.add(card, game);
+					target_card_array.add(target_temp);
+					check_if_there_is_min = true;
+				}
+			}	
+		}
+		else {
+			//combination of n cards in cards array
+			ArrayList<TargetCard> target_combination = new ArrayList<TargetCard>();
+			ArrayList<UUID> cards_array = new ArrayList<UUID>(cards);
+			
+		}
+    	
+	}
+//	int n = target.getMinNumberOfTargets();
+//	if(n <= cards.size()) {
+//		for (Card card :cards){
+//			
+//		}
+//	}
+		
 	return true;
 }
 
-@Override
-public boolean choose(Outcome outcome, Choice choice, Game game) {
-	// TODO Auto-generated method stub
-	return false;
+public static void combinationUtil(ArrayList<Card> element_list,ArrayList<ArrayList<Card>> output,ArrayList<Card> data_temp,int start,int end,int index,int r) {
+	if(index == r) {
+		output.add((ArrayList<Card>) data_temp.clone());
+		return;
+	}
+	else {
+		for(int i = start ; i <= end && end-i+1 >= r-index ;i++) {
+			data_temp.set(index, element_list.get(i));
+			combinationUtil(element_list,output,data_temp,i+1,end,index+1,r);
+		}
+	}
 }
 
-//for sacrifice/
-@Override
-public boolean chooseTarget(Outcome outcome, Target target, Ability source, Game game) {
-	// TODO Auto-generated method stub
-	return false;
-}
+//Choose card name/basic land type/card type/color
+	@Override
+	public boolean choose(Outcome outcome, Choice choice, Game game) {
+		// TODO Auto-generated method stub
+		return false;
+	}
 
-//use for discard
-@Override
-public boolean chooseTarget(Outcome outcome, Cards cards, TargetCard target, Ability source, Game game) {
-	// TODO Auto-generated method stub
-	List<Card> cardChoices = new ArrayList<>(cards.getCards(target.getFilter(), source != null ? source.getSourceId() : null, playerId, game));
-	
-	return false;
-}
+//for sacrifice/target creature +/- p/t
+	@Override
+	public boolean chooseTarget(Outcome outcome, Target target, Ability source, Game game) {
+		// TODO Auto-generated method stub
+		return false;
+	}
 
-@Override
-public boolean chooseTargetAmount(Outcome outcome, TargetAmount target, Ability source, Game game) {
-	// TODO Auto-generated method stub
-	return false;
-}
+//use for discard/hand death choose
+	@Override
+	public boolean chooseTarget(Outcome outcome, Cards cards, TargetCard target, Ability source, Game game) {
+		// TODO Auto-generated method stub
+		List<Card> cardChoices = new ArrayList<>(
+				cards.getCards(target.getFilter(), source != null ? source.getSourceId() : null, playerId, game));
 
-@Override
-public boolean chooseMulligan(Game game) {
-	// TODO Auto-generated method stub
-	return false;
-}
+		return false;
+	}
 
-@Override
-public boolean chooseUse(Outcome outcome, String message, Ability source, Game game) {
-	return chooseUse(outcome,message,"",null,null,source,game);
-}
+	@Override
+	public boolean chooseTargetAmount(Outcome outcome, TargetAmount target, Ability source, Game game) {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	public boolean chooseMulligan(Game game) {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	public boolean chooseUse(Outcome outcome, String message, Ability source, Game game) {
+		return chooseUse(outcome, message, "", null, null, source, game);
+	}
+
 //abundance
-@Override
-public boolean chooseUse(Outcome outcome, String message, String secondMessage, String trueText, String falseText,
-		Ability source, Game game) {
-	
-		if(chooseUseMap.containsKey(this.tree.getCurrent().getLevel())) {
+	@Override
+	public boolean chooseUse(Outcome outcome, String message, String secondMessage, String trueText, String falseText,
+			Ability source, Game game) {
+
+		if (chooseUseMap.containsKey(this.tree.getCurrent().getLevel())) {
 			return this.chooseUseMap.get(this.tree.getCurrent().getLevel());
 		}
-		//do expand process
+		// do expand process
 		game.pause();
 		this.nextAction = NextAction.CHOOSE_USE;
 		this.tree.chooseProcess();
-		
+
 		return false;
-}
-
-@Override
-public boolean choosePile(Outcome outcome, String message, List<? extends Card> pile1, List<? extends Card> pile2,
-		Game game) {
-	// TODO Auto-generated method stub
-	return chooseUse(outcome,message,"",null,null,null,game);
-}
-
-
-@Override
-public boolean playMana(Ability ability, ManaCost unpaid, String promptText, Game game) {
-	payManaMode = true;
-    currentUnpaidMana = unpaid;
-    try {
-        return playManaHandling(ability, unpaid, game);
-    } finally {
-        currentUnpaidMana = null;
-        payManaMode = false;
-    }
-}
-
-@Override
-public int announceXMana(int min, int max, int multiplier, String message, Game game, Ability ability) {
-	return 0;
-}
-
-@Override
-public int announceXCost(int min, int max, String message, Game game, Ability ability, VariableCost variableCost) {
-	// TODO Auto-generated method stub
-	return 0;
-}
-
-@Override
-public int chooseReplacementEffect(Map<String, String> abilityMap, Game game) {
-	// TODO Auto-generated method stub
-	int level = this.getTree().getCurrent().getLevel();
-	if(this.chooseReplacementMap.containsKey(level)) {
-		return this.chooseReplacementMap.get(level);
 	}
-	
-	return 0;
-}
 
-@Override
-public TriggeredAbility chooseTriggeredAbility(List<TriggeredAbility> abilities, Game game) {
-	// TODO Auto-generated method stub
-	return null;
-}
+	@Override
+	public boolean choosePile(Outcome outcome, String message, List<? extends Card> pile1, List<? extends Card> pile2,
+			Game game) {
+		// TODO Auto-generated method stub
+		return chooseUse(outcome, message, "", null, null, null, game);
+	}
 
-@Override
-public Mode chooseMode(Modes modes, Ability source, Game game) {
-	// TODO Auto-generated method stub
-	return null;
-}
+	@Override
+	public boolean playMana(Ability ability, ManaCost unpaid, String promptText, Game game) {
+		payManaMode = true;
+		currentUnpaidMana = unpaid;
+		try {
+			return playManaHandling(ability, unpaid, game);
+		} finally {
+			currentUnpaidMana = null;
+			payManaMode = false;
+		}
+	}
 
-@Override
-public void selectAttackers(Game game, UUID attackingPlayerId) {
-	// TODO Auto-generated method stub
-	
-}
+	@Override
+	public int announceXMana(int min, int max, int multiplier, String message, Game game, Ability ability) {
+		return 0;
+	}
 
-@Override
-public void selectBlockers(Ability source, Game game, UUID defendingPlayerId) {
-	// TODO Auto-generated method stub
-	
-}
+	@Override
+	public int announceXCost(int min, int max, String message, Game game, Ability ability, VariableCost variableCost) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
 
-@Override
-public UUID chooseAttackerOrder(List<Permanent> attacker, Game game) {
-	// TODO Auto-generated method stub
-	return null;
-}
+	@Override
+	public int chooseReplacementEffect(Map<String, String> abilityMap, Game game) {
+		// TODO Auto-generated method stub
+		int level = this.getTree().getCurrent().getLevel();
+		if (this.chooseReplacementMap.containsKey(level)) {
+			return this.chooseReplacementMap.get(level);
+		}
 
-@Override
-public UUID chooseBlockerOrder(List<Permanent> blockers, CombatGroup combatGroup, List<UUID> blockerOrder, Game game) {
-	// TODO Auto-generated method stub
-	return null;
-}
+		return 0;
+	}
 
-@Override
-public void assignDamage(int damage, List<UUID> targets, String singleTargetName, UUID attackerId, Ability source,
-		Game game) {
-	// TODO Auto-generated method stub
-	
-}
+	@Override
+	public TriggeredAbility chooseTriggeredAbility(List<TriggeredAbility> abilities, Game game) {
+		// TODO Auto-generated method stub
+		return null;
+	}
 
-@Override
-public int getAmount(int min, int max, String message, Game game) {
-	// TODO Auto-generated method stub
-	return 0;
-}
+	@Override
+	public Mode chooseMode(Modes modes, Ability source, Game game) {
+		// TODO Auto-generated method stub
+		return null;
+	}
 
-@Override
-public List<Integer> getMultiAmount(Outcome outcome, List<String> messages, int min, int max, MultiAmountType type,
-		Game game) {
-	// TODO Auto-generated method stub
-	return null;
-}
+	@Override
+	public void selectAttackers(Game game, UUID attackingPlayerId) {
+		// TODO Auto-generated method stub
 
-@Override
-public void sideboard(Match match, Deck deck) {
-	// TODO Auto-generated method stub
-	
-}
+	}
 
-@Override
-public void construct(Tournament tournament, Deck deck) {
-	// TODO Auto-generated method stub
-	
-}
+	@Override
+	public void selectBlockers(Ability source, Game game, UUID defendingPlayerId) {
+		// TODO Auto-generated method stub
 
-@Override
-public void pickCard(List<Card> cards, Deck deck, Draft draft) {
-	// TODO Auto-generated method stub
-	
-}
-  
+	}
 
-public int getChooseUseRollBack() {
-	return chooseUseRollBack;
-}
+	@Override
+	public UUID chooseAttackerOrder(List<Permanent> attacker, Game game) {
+		// TODO Auto-generated method stub
+		return null;
+	}
 
+	@Override
+	public UUID chooseBlockerOrder(List<Permanent> blockers, CombatGroup combatGroup, List<UUID> blockerOrder,
+			Game game) {
+		// TODO Auto-generated method stub
+		return null;
+	}
 
+	@Override
+	public void assignDamage(int damage, List<UUID> targets, String singleTargetName, UUID attackerId, Ability source,
+			Game game) {
+		// TODO Auto-generated method stub
 
+	}
 
-public HashMap<Integer, Boolean> getChooseUseMap() {
-	return chooseUseMap;
-}
+	@Override
+	public int getAmount(int min, int max, String message, Game game) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
 
+	@Override
+	public List<Integer> getMultiAmount(Outcome outcome, List<String> messages, int min, int max, MultiAmountType type,
+			Game game) {
+		// TODO Auto-generated method stub
+		return null;
+	}
 
+	@Override
+	public void sideboard(Match match, Deck deck) {
+		// TODO Auto-generated method stub
 
-public void setChooseUseMap(HashMap<Integer, Boolean> chooseUseMap) {
-	this.chooseUseMap = chooseUseMap;
-}
+	}
 
+	@Override
+	public void construct(Tournament tournament, Deck deck) {
+		// TODO Auto-generated method stub
 
+	}
 
-public StackObject getResolvingAbility() {
-	   return resolvingAbility;
-  }
+	@Override
+	public void pickCard(List<Card> cards, Deck deck, Draft draft) {
+		// TODO Auto-generated method stub
 
-  public void setResolvingAbility(StackObject resolvingAbility) {
-	   this.resolvingAbility = resolvingAbility;
-  }
+	}
 
-public HashMap<Integer, Integer> getChooseReplacementMap() {
-	return chooseReplacementMap;
-}
+	public int getChooseUseRollBack() {
+		return chooseUseRollBack;
+	}
 
-public void setChooseReplacementMap(HashMap<Integer, Integer> chooseReplacementMap) {
-	this.chooseReplacementMap = chooseReplacementMap;
-}
+	public HashMap<Integer, Boolean> getChooseUseMap() {
+		return chooseUseMap;
+	}
 
+	public void setChooseUseMap(HashMap<Integer, Boolean> chooseUseMap) {
+		this.chooseUseMap = chooseUseMap;
+	}
+
+	public StackObject getResolvingAbility() {
+		return resolvingAbility;
+	}
+
+	public void setResolvingAbility(StackObject resolvingAbility) {
+		this.resolvingAbility = resolvingAbility;
+	}
+
+	public HashMap<Integer, Integer> getChooseReplacementMap() {
+		return chooseReplacementMap;
+	}
+
+	public void setChooseReplacementMap(HashMap<Integer, Integer> chooseReplacementMap) {
+		this.chooseReplacementMap = chooseReplacementMap;
+	}
 
 }

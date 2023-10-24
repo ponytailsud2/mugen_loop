@@ -21,8 +21,6 @@ import mage.game.Game;
 import mage.game.GameState;
 import mage.game.permanent.Permanent;
 import mage.game.stack.StackObject;
-import mage.player.ai.MCTSNode;
-import mage.player.ai.MCTSPlayer;
 import mage.players.Player;
 import mage.target.Target;
 import mage.util.ThreadLocalStringBuilder;
