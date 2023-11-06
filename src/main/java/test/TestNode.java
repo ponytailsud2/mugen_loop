@@ -23,6 +23,7 @@ import mage.game.permanent.Permanent;
 import mage.game.stack.StackObject;
 import mage.players.Player;
 import mage.target.Target;
+import mage.target.TargetCard;
 import mage.util.ThreadLocalStringBuilder;
 import test.TestGame.CurrentAction;
 
@@ -43,9 +44,12 @@ public class TestNode {
 	private int handCount = 0;
 	private int loopStepCount = 0;
 	private int level;
+	private ArrayList<TargetCard> chooseCardOptionTemp = new ArrayList<TargetCard>();
 	
 	//
 	private Stack<MageItem> availableTarget = new Stack<MageItem>();
+	
+	
 	
 	//use String gameState.getValue as gameState
 	public TestNode(UUID playerId,Game game) {
@@ -191,8 +195,8 @@ public class TestNode {
 			}
 			break;
 		case CHOOSE_USE:
-			TestGame sim = (TestGame) game.copy();
-			ArrayList<CurrentAction> currentActions = ((TestGame)sim).getCurrentAction();
+			TestGame choose_use_sim = (TestGame) game.copy();
+			ArrayList<CurrentAction> currentActions = choose_use_sim.getCurrentAction();
 			if(currentActions.contains(CurrentAction.RESOLVE)) {
 				//Case: replace event take place when resolving effect
 				if(currentActions.contains(CurrentAction.REPLACE)) {
@@ -204,8 +208,8 @@ public class TestNode {
 				}
 				//Case: resolving ability by stack
 				else {
-					chooseUseResolveProcess(sim,player,true);
-					chooseUseResolveProcess(sim,player,false);
+					chooseUseResolveProcess(choose_use_sim,player,true);
+					chooseUseResolveProcess(choose_use_sim,player,false);
 				}
 			}
 			else if(currentActions.contains(CurrentAction.SPECIAL)) {
@@ -213,7 +217,24 @@ public class TestNode {
 			}
 			break;
 		case CHOOSE_REPLACEMENT:
-			
+			break;
+		case CHOOSE_CARD:
+			for(TargetCard target:chooseCardOptionTemp) {
+				TestGame choose_card_sim = (TestGame)game.copy();
+				ArrayList<CurrentAction> choose_card_currentActions = choose_card_sim.getCurrentAction();
+				//Case: replace event take place when resolving effect
+				if(choose_card_currentActions.contains(CurrentAction.REPLACE)) {
+					
+				}
+				//Case: special action not resolve by stack
+				else if(choose_card_currentActions.contains(CurrentAction.SPECIAL)){
+					
+				}
+				else {
+					chooseCardsResolveProcess(choose_card_sim, player, target);
+				}
+				
+			}
 			break;
 		default:
 			break;
@@ -221,6 +242,14 @@ public class TestNode {
 		game = null;
 	}
 	
+	public ArrayList<TargetCard> getChooseCardOptionTemp() {
+		return chooseCardOptionTemp;
+	}
+
+	public void setChooseCardOptionTemp(ArrayList<TargetCard> chooseCardOptionTemp) {
+		this.chooseCardOptionTemp = chooseCardOptionTemp;
+	}
+
 	public void expandChoose(Ability source, Target availableTarget,Game game) {
 		List<? extends Target> targets = availableTarget.getTargetOptions(source, game);
 		
@@ -231,6 +260,14 @@ public class TestNode {
 		
 		TestTreePlayer simPlayer = (TestTreePlayer) sim.getPlayer(player.getId());
 		simPlayer.getChooseUseMap().put(this.level+1, chooseUse);
+		sim.resolve();
+		sim.resume();
+		children.add(new TestNode(this,sim,sim.getResolvingEffect()));
+	}
+	
+	private void chooseCardsResolveProcess(TestGame sim,Player player,TargetCard target) {
+		TestTreePlayer simPlayer = (TestTreePlayer) sim.getPlayer(player.getId());
+		simPlayer.getChooseCardsMap().put(this.level+1, target);
 		sim.resolve();
 		sim.resume();
 		children.add(new TestNode(this,sim,sim.getResolvingEffect()));

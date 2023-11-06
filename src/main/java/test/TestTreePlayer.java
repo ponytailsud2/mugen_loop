@@ -78,6 +78,7 @@ import mage.util.CardUtil;
 import mage.util.ManaUtil;
 import mage.util.MessageToClient;
 import mage.util.RandomUtil;
+import test.TestGame.CurrentAction;
 
 public class TestTreePlayer extends PlayerImpl {
 
@@ -98,11 +99,14 @@ public class TestTreePlayer extends PlayerImpl {
 	// {Level:answer for this Lv}
 	private HashMap<Integer, Boolean> chooseUseMap = new HashMap<Integer, Boolean>();
 	private HashMap<Integer, Integer> chooseReplacementMap = new HashMap<Integer, Integer>();
-	private HashMap<Integer, Target> chooseCardsMap = new HashMap<Integer, Target>();
+	private HashMap<Integer, TargetCard> chooseCardsMap = new HashMap<Integer, TargetCard>();
 	private SpanningTree tree;
-
+	
+	
+	private ArrayList<NextAction> resolveMem = new ArrayList<NextAction>();
+	
 	public enum NextAction {
-		PRIORITY, TRIGGERED, CHOOSE_USE, CHOOSE_REPLACEMENT, CHOOSE
+		PRIORITY, TRIGGERED, CHOOSE_USE, CHOOSE_REPLACEMENT, CHOOSE, CHOOSE_CARD
 	}
 
 	public TestTreePlayer(String name) {
@@ -831,6 +835,68 @@ public class TestTreePlayer extends PlayerImpl {
 
 		return choose(outcome, target, sourceId, game, null);
 	}
+	
+	public ArrayList<TargetCard> chooseCardOption(Cards cards, TargetCard target, Game game){
+		// TODO Auto-generated method stub
+		ArrayList<TargetCard> target_card_array = new ArrayList<TargetCard>();
+		if (cards == null || cards.isEmpty()) {
+	        return target_card_array;
+	    }
+		UUID abilityControllerId = playerId;
+		if (target.getTargetController() != null
+	            && target.getAbilityController() != null) {
+	        abilityControllerId = target.getAbilityController();
+	    }
+		boolean required = target.isRequired(null, game);
+	    int count = cards.count(target.getFilter(), abilityControllerId, game);
+	    if (count == 0
+	            || target.getTargets().size() >= target.getNumberOfTargets()) {
+	        required = false;
+	    }
+	    java.util.List<UUID> choosable = new ArrayList<>();
+	    for (UUID cardId : cards) {
+	        if (target.canTarget(abilityControllerId, cardId, null, cards, game)) {
+	            choosable.add(cardId);
+	        }
+	    }
+	    boolean check_if_there_is_min = false;
+	    for (int n = target.getMinNumberOfTargets();n<=target.getMaxNumberOfTargets();n++) {
+	    	
+	    	if(n <= cards.size()) {
+				if(check_if_there_is_min) {
+					continue;
+				}else {
+					TargetCard target_temp = new TargetCard(target);
+					for (UUID card :cards){
+						target_temp.add(card, game);
+						target_card_array.add(target_temp);
+						check_if_there_is_min = true;
+					}
+				}	
+			}
+			else {
+				//combination of n cards in cards array
+				ArrayList<TargetCard> target_combination = new ArrayList<TargetCard>();
+				ArrayList<ArrayList<UUID>> card_combination = new ArrayList<ArrayList<UUID>>();
+				ArrayList<UUID> cards_array = new ArrayList<UUID>(cards);
+				ArrayList<UUID> temp = new ArrayList<UUID>();
+				//adding null elements to replace when generate combinations
+				for(int i = 0;i<n;i++) {
+					temp.add(null);
+				}
+				combinationUtil(cards_array,card_combination,temp,0,cards_array.size()-1,0,n);
+				for(int i = 0;i<card_combination.size();i++) {
+					TargetCard target_temp = new TargetCard(target);
+					for(int j = 0; j< card_combination.get(i).size();j++) {
+						target_temp.add(card_combination.get(i).get(j), game);
+					}
+					target_card_array.add(target_temp);
+				}
+			}
+	    	
+		}
+	    return target_card_array;
+	}
 //hide away/ripple
 //search
 //cast card from outside the game, nivv mezzet reborn/draw discard one of them
@@ -839,63 +905,95 @@ public class TestTreePlayer extends PlayerImpl {
 @Override
 public boolean choose(Outcome outcome, Cards cards, TargetCard target, Game game) {
 	// TODO Auto-generated method stub
-	if (cards == null || cards.isEmpty()) {
-        return false;
-    }
-	UUID abilityControllerId = playerId;
-	if (target.getTargetController() != null
-            && target.getAbilityController() != null) {
-        abilityControllerId = target.getAbilityController();
-    }
-	boolean required = target.isRequired(null, game);
-    int count = cards.count(target.getFilter(), abilityControllerId, game);
-    if (count == 0
-            || target.getTargets().size() >= target.getNumberOfTargets()) {
-        required = false;
-    }
-    java.util.List<UUID> choosable = new ArrayList<>();
-    for (UUID cardId : cards) {
-        if (target.canTarget(abilityControllerId, cardId, null, cards, game)) {
-            choosable.add(cardId);
-        }
-    }
-    boolean check_if_there_is_min = false;
-	ArrayList<TargetCard> target_card_array = new ArrayList<TargetCard>();
-    for (int n = target.getMinNumberOfTargets();n<=target.getMaxNumberOfTargets();n++) {
-    	
-    	if(n <= cards.size()) {
-			if(check_if_there_is_min) {
-				continue;
-			}else {
-				TargetCard target_temp = new TargetCard(target);
-				for (UUID card :cards){
-					target_temp.add(card, game);
-					target_card_array.add(target_temp);
-					check_if_there_is_min = true;
-				}
-			}	
-		}
-		else {
-			//combination of n cards in cards array
-			ArrayList<TargetCard> target_combination = new ArrayList<TargetCard>();
-			ArrayList<UUID> cards_array = new ArrayList<UUID>(cards);
-			
-		}
-    	
+	int level = this.tree.getCurrent().getLevel();
+	if(resolveMem.size() > 0 && resolveMem.get(0).equals(NextAction.CHOOSE_CARD) && chooseCardsMap.containsKey(level-(resolveMem.size()-1))) {
+		resolveMem.remove(0);
+		target = this.chooseCardsMap.get(level - (resolveMem.size()-1)).copy();
+		return true;
 	}
-//	int n = target.getMinNumberOfTargets();
-//	if(n <= cards.size()) {
-//		for (Card card :cards){
-//			
+	
+	if (cards == null || cards.isEmpty()) {
+      return false;
+	}
+	// do expand process
+	game.pause();
+	this.nextAction = NextAction.CHOOSE_CARD;
+	this.tree.getCurrent().setChooseCardOptionTemp(chooseCardOption(cards, target, game));
+	this.tree.chooseProcess();
+	
+	return false;
+	
+//	if (cards == null || cards.isEmpty()) {
+//        return false;
+//    }
+//	
+//	UUID abilityControllerId = playerId;
+//	if (target.getTargetController() != null
+//            && target.getAbilityController() != null) {
+//        abilityControllerId = target.getAbilityController();
+//    }
+//	boolean required = target.isRequired(null, game);
+//    int count = cards.count(target.getFilter(), abilityControllerId, game);
+//    if (count == 0
+//            || target.getTargets().size() >= target.getNumberOfTargets()) {
+//        required = false;
+//    }
+//    java.util.List<UUID> choosable = new ArrayList<>();
+//    for (UUID cardId : cards) {
+//        if (target.canTarget(abilityControllerId, cardId, null, cards, game)) {
+//            choosable.add(cardId);
+//        }
+//    }
+//    boolean check_if_there_is_min = false;
+//	ArrayList<TargetCard> target_card_array = new ArrayList<TargetCard>();
+//    for (int n = target.getMinNumberOfTargets();n<=target.getMaxNumberOfTargets();n++) {
+//    	
+//    	if(n <= cards.size()) {
+//			if(check_if_there_is_min) {
+//				continue;
+//			}else {
+//				TargetCard target_temp = new TargetCard(target);
+//				for (UUID card :cards){
+//					target_temp.add(card, game);
+//					target_card_array.add(target_temp);
+//					check_if_there_is_min = true;
+//				}
+//			}	
 //		}
+//		else {
+//			//combination of n cards in cards array
+//			ArrayList<TargetCard> target_combination = new ArrayList<TargetCard>();
+//			ArrayList<ArrayList<UUID>> card_combination = new ArrayList<ArrayList<UUID>>();
+//			ArrayList<UUID> cards_array = new ArrayList<UUID>(cards);
+//			ArrayList<UUID> temp = new ArrayList<UUID>();
+//			//adding null elements to replace when generate combinations
+//			for(int i = 0;i<n;i++) {
+//				temp.add(null);
+//			}
+//			combinationUtil(cards_array,card_combination,temp,0,cards_array.size()-1,0,n);
+//			for(int i = 0;i<card_combination.size();i++) {
+//				TargetCard target_temp = new TargetCard(target);
+//				for(int j = 0; j< card_combination.get(i).size();j++) {
+//					target_temp.add(card_combination.get(i).get(j), game);
+//				}
+//				target_card_array.add(target_temp);
+//			}
+//		}
+//    	
 //	}
-		
-	return true;
+////	int n = target.getMinNumberOfTargets();
+////	if(n <= cards.size()) {
+////		for (Card card :cards){
+////			
+////		}
+////	}
+//		
+//	return true;
 }
 
-public static void combinationUtil(ArrayList<Card> element_list,ArrayList<ArrayList<Card>> output,ArrayList<Card> data_temp,int start,int end,int index,int r) {
+public static void combinationUtil(ArrayList<UUID> element_list,ArrayList<ArrayList<UUID>> output,ArrayList<UUID> data_temp,int start,int end,int index,int r) {
 	if(index == r) {
-		output.add((ArrayList<Card>) data_temp.clone());
+		output.add((ArrayList<UUID>) data_temp.clone());
 		return;
 	}
 	else {
@@ -923,7 +1021,7 @@ public static void combinationUtil(ArrayList<Card> element_list,ArrayList<ArrayL
 //use for discard/hand death choose
 	@Override
 	public boolean chooseTarget(Outcome outcome, Cards cards, TargetCard target, Ability source, Game game) {
-		// TODO Auto-generated method stub
+		
 		List<Card> cardChoices = new ArrayList<>(
 				cards.getCards(target.getFilter(), source != null ? source.getSourceId() : null, playerId, game));
 
@@ -951,13 +1049,18 @@ public static void combinationUtil(ArrayList<Card> element_list,ArrayList<ArrayL
 	@Override
 	public boolean chooseUse(Outcome outcome, String message, String secondMessage, String trueText, String falseText,
 			Ability source, Game game) {
-
-		if (chooseUseMap.containsKey(this.tree.getCurrent().getLevel())) {
-			return this.chooseUseMap.get(this.tree.getCurrent().getLevel());
+		int level = this.tree.getCurrent().getLevel();
+		if(resolveMem.size() > 0 && resolveMem.get(0).equals(NextAction.CHOOSE_USE) && chooseUseMap.containsKey(level-(resolveMem.size()-1))) {
+			resolveMem.remove(0);
+			return this.chooseUseMap.get(level - (resolveMem.size()-1));
 		}
+		
 		// do expand process
 		game.pause();
 		this.nextAction = NextAction.CHOOSE_USE;
+		if(((TestGame)game).getCurrentAction().contains(CurrentAction.RESOLVE)) {
+			resolveMem.add(this.nextAction);
+		}
 		this.tree.chooseProcess();
 
 		return false;
@@ -1105,6 +1208,14 @@ public static void combinationUtil(ArrayList<Card> element_list,ArrayList<ArrayL
 
 	public void setChooseReplacementMap(HashMap<Integer, Integer> chooseReplacementMap) {
 		this.chooseReplacementMap = chooseReplacementMap;
+	}
+
+	public HashMap<Integer, TargetCard> getChooseCardsMap() {
+		return chooseCardsMap;
+	}
+
+	public void setChooseCardsMap(HashMap<Integer, TargetCard> chooseCardsMap) {
+		this.chooseCardsMap = chooseCardsMap;
 	}
 
 }

@@ -46,15 +46,15 @@ public class SpanningTree {
 
 	public void triggeringProcess(){
 		player.setNextAction(NextAction.TRIGGERED);
-		root.expand();
+		current.expand();
 	}
 	
 	public void chooseProcess() {
-		root.expand();
+		current.expand();
 	}
 	
 	public void priorityProcess() {
-		root.expand();	
+		current.expand();	
 	}
 	
 	public void nodeInit() {

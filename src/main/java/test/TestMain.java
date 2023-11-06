@@ -15,6 +15,10 @@ import mage.cards.b.BattleflightEagle;
 import mage.cards.basiclands.Plains;
 import mage.cards.basiclands.Swamp;
 import mage.cards.decks.Deck;
+import mage.cards.l.LotusField;
+import mage.cards.m.MassHysteria;
+import mage.cards.p.PemminsAura;
+import mage.cards.s.SarythTheVipersFang;
 import mage.cards.u.UndiscoveredParadise;
 import mage.constants.MultiplayerAttackOption;
 import mage.constants.RangeOfInfluence;
@@ -56,7 +60,7 @@ public class TestMain {
 		
 		System.out.println(testGame.getStartingLife());
 		System.out.println(testGame.getPlayer(testPlayer2.getId()).getLibrary().size());
-		ArrayList<PermanentCard> lands = lands(6,owner,testGame);
+		
 		ArrayList<PermanentCard> lands2 = lands(6,owner,testGame);
 		PermanentCard anabafield = new PermanentCard(new AnabaShaman(owner,info),owner,testGame);
 		ArrayList<Card> hand = new ArrayList<Card>();
@@ -64,21 +68,32 @@ public class TestMain {
 		AccursedCentaur test_sacrifice_card = new AccursedCentaur(owner, info);
 		PermanentCard test_sacrifice = new PermanentCard(test_sacrifice_card,owner,testGame);		
 		
+		SarythTheVipersFang combo_card_1 = new SarythTheVipersFang(owner,info);
+		LotusField combo_card_2 = new LotusField(owner,info);
+		PemminsAura combo_card_3 = new PemminsAura(owner,info);
+		MassHysteria mass_hysteria = new MassHysteria(owner,info);
+		PermanentCard mass_hysteria_per = new PermanentCard(mass_hysteria,owner,testGame);
+		System.out.println(combo_card_1.getManaValue());
+		System.out.println(combo_card_2.getManaValue());
+		System.out.println(combo_card_3.getManaValue());
+		
+		ArrayList<PermanentCard> lands = lands(combo_card_1.getManaValue()+combo_card_2.getManaValue()+combo_card_3.getManaValue()+5,owner,testGame);
+		lands.add(mass_hysteria_per);
+		SpanningTree simulation = new SpanningTree(testPlayer, testPlayer2);
 		//test combination
-		ArrayList<ArrayList<Card>> combi_test_output = new ArrayList<ArrayList<Card>>();
-		ArrayList<Card> temp = new ArrayList<Card>();
-		for(int i = 0;i<3;i++) {
-			temp.add(testCard.copy());
-		}
-		ArrayList<Card> library_cards = library(testPlayer.getId(),testGame);
-
-		System.out.println(library_cards);
-		TestTreePlayer.combinationUtil(library_cards, combi_test_output, temp, 0, library_cards.size()-1, 0, 3);
-		for(ArrayList<Card> cards : combi_test_output) {
-			System.out.print("combi : ");
-			System.out.println(cards);
-		}
-		System.out.println(combi_test_output.size());
+//		ArrayList<ArrayList<Card>> combi_test_output = new ArrayList<ArrayList<Card>>();
+//		ArrayList<Card> temp = new ArrayList<Card>();
+//		for(int i = 0;i<3;i++) {
+//			temp.add(null);
+//		}
+//		ArrayList<Card> library_cards = library(testPlayer.getId(),testGame);
+//
+//		System.out.println(library_cards);
+//		for(ArrayList<Card> cards : combi_test_output) {
+//			System.out.print("combi : ");
+//			System.out.println(cards);
+//		}
+//		System.out.println(combi_test_output.size());
 
 //		System.out.println(testGame.getBattlefield());
 //		System.out.println(testGame.getBattlefield().getAllActivePermanents(testPlayer2.getId()));
