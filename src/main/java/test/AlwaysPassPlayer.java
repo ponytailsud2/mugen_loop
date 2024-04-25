@@ -13,6 +13,7 @@ import mage.abilities.Ability;
 import mage.abilities.Mode;
 import mage.abilities.Modes;
 import mage.abilities.TriggeredAbility;
+import mage.abilities.common.PassAbility;
 import mage.abilities.costs.VariableCost;
 import mage.abilities.costs.mana.ManaCost;
 import mage.cards.Card;
@@ -30,30 +31,45 @@ import mage.game.permanent.Permanent;
 import mage.game.tournament.Tournament;
 import mage.players.Player;
 import mage.players.PlayerImpl;
+import mage.players.net.UserData;
 import mage.target.Target;
 import mage.target.TargetAmount;
 import mage.target.TargetCard;
 import mage.util.RandomUtil;
 
 public class AlwaysPassPlayer extends PlayerImpl{
+	
+	protected PassAbility pass = new PassAbility();
+
 
 	public AlwaysPassPlayer(String name, RangeOfInfluence range) {
 		// TODO Auto-generated constructor stub
 		super(name,range);
 		human = false;
-		
+		this.userData = UserData.getDefaultUserDataView();
 	}
 	
 	public AlwaysPassPlayer(final AlwaysPassPlayer player) {
 		// TODO Auto-generated constructor stub
 		super(player);
+		this.userData = player.userData;
 		
 	}
 
 	public AlwaysPassPlayer(UUID uuid, String name) {
 		// TODO Auto-generated constructor stub
 		super(name,RangeOfInfluence.ONE);
+		this.userData = UserData.getDefaultUserDataView();
 		human = false;
+	}
+
+	public AlwaysPassPlayer(UUID id) {
+		// TODO Auto-generated constructor stub
+		super(id);
+		this.pass.setControllerId(this.getId());
+		human = false;
+		this.setTestMode(true);
+		this.userData = UserData.getDefaultUserDataView();
 	}
 
 	@Override

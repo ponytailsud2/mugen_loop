@@ -16,6 +16,7 @@ import mage.abilities.effects.ContinuousEffects;
 import mage.constants.MultiplayerAttackOption;
 import mage.constants.PhaseStep;
 import mage.constants.RangeOfInfluence;
+import mage.constants.TurnPhase;
 import mage.constants.Zone;
 import mage.game.GameImpl;
 import mage.game.GameState;
@@ -25,6 +26,7 @@ import mage.game.match.MatchType;
 import mage.game.mulligan.LondonMulligan;
 import mage.game.stack.StackObject;
 import mage.game.turn.PreCombatMainPhase;
+import mage.game.turn.PreCombatMainStep;
 import mage.game.turn.TurnMod;
 import mage.players.Player;
 
@@ -37,7 +39,7 @@ public class TestGame extends GameImpl{
 	private ContinuousEffects applyingReplaceEffects;
 	private TestGame resolvingEffectGame;
 	private StackObject resolvingEffect;
-	private ArrayList<CurrentAction> currentAction;
+	private ArrayList<CurrentAction> currentAction = new ArrayList<CurrentAction>();
 	private int infiniteLoopCounter = 0;
 	
 	public enum CurrentAction {
@@ -55,6 +57,7 @@ public class TestGame extends GameImpl{
 	public TestGame(SpanningTree spanningTree) {
 		super(MultiplayerAttackOption.LEFT,RangeOfInfluence.ALL,new LondonMulligan(0),20,7);
 		// TODO Auto-generated constructor stub
+		this.currentAction = new ArrayList<CurrentAction>();
 		this.spanningTree = spanningTree;
 		
 	}
@@ -82,6 +85,7 @@ public class TestGame extends GameImpl{
 		state.getTurnMods().add(new TurnMod(startingPlayerId, PhaseStep.PRECOMBAT_MAIN));
 		playerList = state.getPlayerList(nextPlayerId);
 		Player mainPlayer = getPlayer(playerList.get());
+		System.out.println("main player :"+mainPlayer);
 		playTurn(mainPlayer);
 	}
 	
@@ -123,7 +127,7 @@ public class TestGame extends GameImpl{
                                 }
                                 // resetPassed should be called if player performs any action
                                 if (player.priority(this)) {
-                                	spanningTree.priorityProcess();
+//                                	spanningTree.priorityProcess();
                                     if (executingRollback()) {
                                         return;
                                     }
@@ -161,6 +165,7 @@ public class TestGame extends GameImpl{
                         if ((ex instanceof NullPointerException)
                                 && errorContinueCounter == 0 && ex.getStackTrace() != null) {
 //                            logger.fatal(ex.getStackTrace());
+                        	System.out.println(ex.getStackTrace());
                         }
                         this.fireErrorEvent("Game exception occurred: ", ex);
 
@@ -259,15 +264,15 @@ public class TestGame extends GameImpl{
                 	}
                 }               
                 
-                if(player instanceof TestTreePlayer) {
-                	spanningTree.triggeringProcess();
-                	this.pause();
-                	triggeringOptions.clear();
-                	break;
-                }
-                else if (abilities.size() == 1) {
+//                if(player instanceof TestTreePlayer) {
+//                	spanningTree.triggeringProcess();
+//                	this.pause();
+//                	triggeringOptions.clear();
+//                	break;
+//                }
+                if (abilities.size() == 1) {
 //                	System.out.println("option size: "+player.getPlayableOptions(abilities.get(0), this).size());
-                	System.out.println("option : "+player.getPlayableOptions(abilities.get(0), this));
+                	System.out.println("trigger option : "+player.getPlayableOptions(abilities.get(0), this));
                 	for(Ability ta:player.getPlayableOptions(abilities.get(0), this)) {
                 		System.out.println("optionID :"+ta.getId());
                 	}
@@ -289,13 +294,20 @@ public class TestGame extends GameImpl{
 	private boolean playTurn(Player player) {
         boolean skipTurn = false;
         state.setActivePlayerId(player.getId());
-        //skipTurn = state.getTurn().play(this, player);
-        PreCombatMainPhase testMainPhase = new PreCombatMainPhase();
+//        skipTurn = state.getTurn().play(this, player);
+        PreCombatMainPhase testMainPhase = (PreCombatMainPhase) state.getTurn().getPhase(TurnPhase.PRECOMBAT_MAIN);
         
         
         state.getTurn().setPhase(testMainPhase);
-        //System.out.println(player.getPlayableOptions(this));
-        testMainPhase.play(this, id);
+        getPhase().beginPhase(this, player.getId());
+        System.out.println(state.getTurn().getPhase());
+//      getState().getTurn().getPhase().setStep(new PreCombatMainStep());
+        System.out.println(getBattlefield().getAllActivePermanents(player.getId()));
+        System.out.println("main :"+isMainPhase());
+		System.out.println("active :"+ player.getId());
+		System.out.println(getStack().isEmpty());
+		System.out.println(player.getLife());
+        testMainPhase.play(this, player.getId());
         
         
         if (isPaused() || checkIfGameIsOver()) {
@@ -332,7 +344,7 @@ public class TestGame extends GameImpl{
             if(top.getControllerId()==spanningTree.getPlayer().getId()) {
             	this.resolvingEffectGame = new TestGame(this);
             	this.resolvingEffect = top;
-            	spanningTree.getPlayer().setResolvingAbility(top);
+//            	spanningTree.getPlayer().setResolvingAbility(top);
             }
             top.resolve(this);
             resetControlAfterSpellResolve(top.getId());

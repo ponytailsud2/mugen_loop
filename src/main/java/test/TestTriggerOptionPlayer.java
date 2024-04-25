@@ -38,7 +38,7 @@ public class TestTriggerOptionPlayer extends TestTreePlayer {
     private HashMap<Ability,Ability> optionTest = new HashMap<Ability,Ability>();
 
 	public TestTriggerOptionPlayer(String name) {
-		super(name);
+		super(new UUID(0,0));
 		// TODO Auto-generated constructor stub
 	}
 

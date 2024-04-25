@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import java.util.Map.Entry;
+import java.util.stream.Collectors;
 
 import mage.ApprovingObject;
 import mage.ConditionalMana;
@@ -27,7 +28,9 @@ import mage.abilities.Modes;
 import mage.abilities.SpecialAction;
 import mage.abilities.SpellAbility;
 import mage.abilities.TriggeredAbility;
+import mage.abilities.common.EntersBattlefieldTriggeredAbility;
 import mage.abilities.common.PassAbility;
+import mage.abilities.common.SacrificeSourceTriggeredAbility;
 import mage.abilities.costs.Cost;
 import mage.abilities.costs.VariableCost;
 import mage.abilities.costs.mana.ColoredManaCost;
@@ -40,6 +43,7 @@ import mage.abilities.costs.mana.MonoHybridManaCost;
 import mage.abilities.costs.mana.PhyrexianManaCost;
 import mage.abilities.costs.mana.SnowManaCost;
 import mage.abilities.mana.ActivatedManaAbilityImpl;
+import mage.abilities.mana.AnyColorManaAbility;
 import mage.abilities.mana.ManaOptions;
 import mage.cards.Card;
 import mage.cards.Cards;
@@ -48,6 +52,7 @@ import mage.cards.decks.Deck;
 import mage.choices.Choice;
 import mage.constants.AsThoughEffectType;
 import mage.constants.CardType;
+import mage.constants.ColoredManaSymbol;
 import mage.constants.ManaType;
 import mage.constants.MultiAmountType;
 import mage.constants.Outcome;
@@ -68,12 +73,15 @@ import mage.game.tournament.Tournament;
 import mage.players.ManaPoolItem;
 import mage.players.Player;
 import mage.players.PlayerImpl;
+import mage.players.net.UserData;
 import mage.target.Target;
 import mage.target.TargetAmount;
 import mage.target.TargetCard;
 import mage.target.TargetImpl;
 import mage.target.TargetPermanent;
 import mage.target.Targets;
+import mage.target.targetpointer.FirstTargetPointer;
+import mage.target.targetpointer.TargetPointer;
 import mage.util.CardUtil;
 import mage.util.ManaUtil;
 import mage.util.MessageToClient;
@@ -100,7 +108,7 @@ public class TestTreePlayer extends PlayerImpl {
 	private HashMap<Integer, Boolean> chooseUseMap = new HashMap<Integer, Boolean>();
 	private HashMap<Integer, Integer> chooseReplacementMap = new HashMap<Integer, Integer>();
 	private HashMap<Integer, TargetCard> chooseCardsMap = new HashMap<Integer, TargetCard>();
-	private SpanningTree tree;
+//	private SpanningTree tree;
 	
 	
 	private ArrayList<NextAction> resolveMem = new ArrayList<NextAction>();
@@ -109,16 +117,17 @@ public class TestTreePlayer extends PlayerImpl {
 		PRIORITY, TRIGGERED, CHOOSE_USE, CHOOSE_REPLACEMENT, CHOOSE, CHOOSE_CARD
 	}
 
-	public TestTreePlayer(String name) {
-		super(name, RangeOfInfluence.ALL);
+	public TestTreePlayer(UUID uuid) {
+		super(uuid);
 		this.pass.setControllerId(this.getId());
 		human = false;
 		this.setTestMode(true);
+		userData = UserData.getDefaultUserDataView();
 	}
 
 	public TestTreePlayer(final TestTreePlayer player) {
 		super(player);
-		this.tree = player.getTree();
+//		this.tree = player.getTree();
 		this.chooseUseMap = player.getChooseUseMap();
 		this.chooseReplacementMap = player.getChooseReplacementMap();
 	}
@@ -142,13 +151,13 @@ public class TestTreePlayer extends PlayerImpl {
 //	   return true;
 //   }
 
-	public SpanningTree getTree() {
-		return tree;
-	}
-
-	public void setTree(SpanningTree tree) {
-		this.tree = tree;
-	}
+//	public SpanningTree getTree() {
+//		return tree;
+//	}
+//
+//	public void setTree(SpanningTree tree) {
+//		this.tree = tree;
+//	}
 
 	protected List<ActivatedAbility> getPlayableAbilities(Game game) {
 		List<ActivatedAbility> playables = getPlayable(game, true);
@@ -162,16 +171,16 @@ public class TestTreePlayer extends PlayerImpl {
 		for (ActivatedAbility ability : playables) {
 			List<Ability> options = game.getPlayer(playerId).getPlayableOptions(ability, game);
 //           System.out.println("Playable: |"+ability.getRule()+" | "+game.getPlayer(playerId).getPlayableOptions(ability, game));
-			for (Ability abOptions : game.getPlayer(playerId).getPlayableOptions(ability, game)) {
-				for (Target target : abOptions.getAllSelectedTargets()) {
-					System.out.println("target: " + target.getFirstTarget());
-				}
-				for (Cost cost : abOptions.getCosts()) {
-					for (Target target : cost.getTargets()) {
-						System.out.println("cost target: " + target.getFirstTarget());
-					}
-				}
-			}
+//			for (Ability abOptions : game.getPlayer(playerId).getPlayableOptions(ability, game)) {
+//				for (Target target : abOptions.getAllSelectedTargets()) {
+//					System.out.println("target: " + target.getFirstTarget());
+//				}
+//				for (Cost cost : abOptions.getCosts()) {
+//					for (Target target : cost.getTargets()) {
+//						System.out.println("cost target: " + target.getFirstTarget());
+//					}
+//				}
+//			}
 			if (options.isEmpty()) {
 				if (!ability.getManaCosts().getVariableCosts().isEmpty()) {
 					simulateVariableCosts(ability, all, game);
@@ -494,7 +503,7 @@ public class TestTreePlayer extends PlayerImpl {
 	}
 
 	protected boolean playManaHandling(Ability ability, ManaCost unpaid, final Game game) {
-//     log.info("paying for " + unpaid.getText());
+     System.out.println("paying for " + unpaid.getText());
 		ApprovingObject approvingObject = game.getContinuousEffects().asThough(ability.getSourceId(),
 				AsThoughEffectType.SPEND_OTHER_MANA, ability, ability.getControllerId(), game);
 		ManaCost cost;
@@ -556,6 +565,15 @@ public class TestTreePlayer extends PlayerImpl {
 								continue;
 							}
 							if (activateAbility(manaAbility, game)) {
+								if (manaAbility instanceof AnyColorManaAbility) {
+									this.manaPool.addMana(cost.getMana(), game, manaAbility);
+		
+								}
+//								System.out.println("tapped: "+game.getBattlefield().getAllPermanents().stream()
+//						                .filter(Permanent::isTapped)
+//						                .collect(Collectors.toList()).size());
+//								System.out.println("mana: " + game.getPlayer(playerId).getManaAvailable(game));
+//								System.out.println("pool: " + this.manaPool);
 								return true;
 							}
 						}
@@ -656,6 +674,10 @@ public class TestTreePlayer extends PlayerImpl {
 								continue;
 							}
 							if (activateAbility(manaAbility, game)) {
+								if (manaAbility instanceof AnyColorManaAbility) {
+									this.manaPool.addMana(new Mana(ColoredManaSymbol.W), game, manaAbility);
+		
+								}
 								return true;
 							}
 						}
@@ -723,7 +745,7 @@ public class TestTreePlayer extends PlayerImpl {
 		// TODO Auto-generated method stub
 		return new TestTreePlayer(this);
 	}
-
+// TO-DO choose first target
 	@Override
 	public boolean choose(Outcome outcome, Target target, UUID sourceId, Game game, Map<String, Serializable> options) {
 		UUID abilityControllerId = playerId;
@@ -739,7 +761,7 @@ public class TestTreePlayer extends PlayerImpl {
 		if (options == null) {
 			options = new HashMap<>();
 		}
-		Set<UUID> targetIds = target.possibleTargets(sourceId, abilityControllerId, game);
+		List<UUID> targetIds = new ArrayList<>(target.possibleTargets(sourceId, abilityControllerId, game));
 
 		if (targetIds == null || targetIds.isEmpty()) {
 			return target.getTargets().size() >= target.getNumberOfTargets();
@@ -749,8 +771,16 @@ public class TestTreePlayer extends PlayerImpl {
 		if (target.getTargets().size() >= target.getNumberOfTargets()) {
 			required = false;
 		}
-
+		if(targetIds.size() == 1) {
+			target.add(targetIds.get(0), game);
+			if(target.isChosen()) {
+				return true;
+			}
+		}
 		java.util.List<UUID> chosen = target.getTargets();
+		
+		
+		
 //      options.put("chosen", (Serializable) chosen);
 //
 //      updateGameStatePriority("choose(5)", game);
@@ -905,7 +935,7 @@ public class TestTreePlayer extends PlayerImpl {
 @Override
 public boolean choose(Outcome outcome, Cards cards, TargetCard target, Game game) {
 	// TODO Auto-generated method stub
-	int level = this.tree.getCurrent().getLevel();
+	int level = 0;
 	if(resolveMem.size() > 0 && resolveMem.get(0).equals(NextAction.CHOOSE_CARD) && chooseCardsMap.containsKey(level-(resolveMem.size()-1))) {
 		resolveMem.remove(0);
 		target = this.chooseCardsMap.get(level - (resolveMem.size()-1)).copy();
@@ -918,8 +948,8 @@ public boolean choose(Outcome outcome, Cards cards, TargetCard target, Game game
 	// do expand process
 	game.pause();
 	this.nextAction = NextAction.CHOOSE_CARD;
-	this.tree.getCurrent().setChooseCardOptionTemp(chooseCardOption(cards, target, game));
-	this.tree.chooseProcess();
+//	this.tree.getCurrent().setChooseCardOptionTemp(chooseCardOption(cards, target, game));
+//	this.tree.chooseProcess();
 	
 	return false;
 	
@@ -1015,6 +1045,45 @@ public static void combinationUtil(ArrayList<UUID> element_list,ArrayList<ArrayL
 	@Override
 	public boolean chooseTarget(Outcome outcome, Target target, Ability source, Game game) {
 		// TODO Auto-generated method stub
+		//6-12-2023
+		// TODO Auto-generated method stub
+		//use for temp to test simulation loop
+		if(source instanceof EntersBattlefieldTriggeredAbility) {
+			UUID sourceId = source != null ? source.getSourceId() : null;
+			UUID abilityControllerId = playerId;
+			if (target.getAbilityController() != null) {
+	            abilityControllerId = target.getAbilityController();
+	        }
+			Set<UUID> possibleTargets = target.possibleTargets(sourceId, abilityControllerId, game);
+			for(UUID id : possibleTargets) {
+				if(!id.equals(sourceId) && target.canTarget(abilityControllerId,id,source,game)) {
+					target.addTarget(id,source,game);
+				}
+				if(target.isChosen()) {
+					return true;
+				}
+				
+			}
+			return true;
+		}
+		int level = 0;
+		if(resolveMem.size() > 0 && resolveMem.get(0).equals(NextAction.CHOOSE_CARD) && chooseCardsMap.containsKey(level-(resolveMem.size()-1))) {
+			resolveMem.remove(0);
+			target = this.chooseCardsMap.get(level - (resolveMem.size()-1)).copy();
+			return true;
+		}
+		UUID sourceId = source != null ? source.getSourceId() : null;
+		UUID abilityControllerId = playerId;
+		if (target.getAbilityController() != null) {
+            abilityControllerId = target.getAbilityController();
+        }
+		Set<UUID> possibleTargets = target.possibleTargets(sourceId, abilityControllerId, game);
+		// do expand process
+		game.pause();
+		this.nextAction = NextAction.CHOOSE_CARD;
+//		this.tree.getCurrent().setChooseCardOptionTemp(chooseCardOption(cards, target, game));
+//		this.tree.chooseProcess();
+		
 		return false;
 	}
 
@@ -1046,22 +1115,36 @@ public static void combinationUtil(ArrayList<UUID> element_list,ArrayList<ArrayL
 	}
 
 //abundance
+	//to do choose tap/untap
+	//for test
 	@Override
 	public boolean chooseUse(Outcome outcome, String message, String secondMessage, String trueText, String falseText,
 			Ability source, Game game) {
-		int level = this.tree.getCurrent().getLevel();
+		int level = 0;
 		if(resolveMem.size() > 0 && resolveMem.get(0).equals(NextAction.CHOOSE_USE) && chooseUseMap.containsKey(level-(resolveMem.size()-1))) {
 			resolveMem.remove(0);
 			return this.chooseUseMap.get(level - (resolveMem.size()-1));
 		}
-		
+		//To do
 		// do expand process
-		game.pause();
-		this.nextAction = NextAction.CHOOSE_USE;
-		if(((TestGame)game).getCurrentAction().contains(CurrentAction.RESOLVE)) {
-			resolveMem.add(this.nextAction);
+//		game.pause();
+//		this.nextAction = NextAction.CHOOSE_USE;
+//		if(((TestGame)game).getCurrentAction().contains(CurrentAction.RESOLVE)) {
+//			resolveMem.add(this.nextAction);
+//		}
+		TargetPointer targetPointer = FirstTargetPointer.getInstance();
+		Permanent target = game.getPermanent(targetPointer.getFirst(game, source));
+		target.getId();
+		if(target != null) {
+			if(outcome == Outcome.Untap &&target.isTapped()) {	
+				return true;
+			}
+			else if(outcome == Outcome.Tap && !target.isTapped()) {
+				return true;
+			}
+
 		}
-		this.tree.chooseProcess();
+//		this.tree.chooseProcess();
 
 		return false;
 	}
@@ -1078,7 +1161,12 @@ public static void combinationUtil(ArrayList<UUID> element_list,ArrayList<ArrayL
 		payManaMode = true;
 		currentUnpaidMana = unpaid;
 		try {
-			return playManaHandling(ability, unpaid, game);
+			boolean temp = playManaHandling(ability, unpaid, game);
+//			System.out.println("manapool :"+this.manaPool);
+//			System.out.println("tapped :"+ game.getBattlefield().getAllPermanents().stream()
+//	                .filter(Permanent::isTapped)
+//	                .collect(Collectors.toList()).size());
+			return temp;
 		} finally {
 			currentUnpaidMana = null;
 			payManaMode = false;
@@ -1099,7 +1187,7 @@ public static void combinationUtil(ArrayList<UUID> element_list,ArrayList<ArrayL
 	@Override
 	public int chooseReplacementEffect(Map<String, String> abilityMap, Game game) {
 		// TODO Auto-generated method stub
-		int level = this.getTree().getCurrent().getLevel();
+		int level = 0;
 		if (this.chooseReplacementMap.containsKey(level)) {
 			return this.chooseReplacementMap.get(level);
 		}

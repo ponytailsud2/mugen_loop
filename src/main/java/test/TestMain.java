@@ -11,14 +11,23 @@ import mage.cards.CardSetInfo;
 import mage.cards.a.AbbeyMatron;
 import mage.cards.a.AccursedCentaur;
 import mage.cards.a.AnabaShaman;
+import mage.cards.a.AzamiLadyOfScrolls;
 import mage.cards.b.BattleflightEagle;
+import mage.cards.basiclands.Forest;
+import mage.cards.basiclands.Island;
+import mage.cards.basiclands.Mountain;
 import mage.cards.basiclands.Plains;
 import mage.cards.basiclands.Swamp;
+import mage.cards.c.CultivatorsCaravan;
 import mage.cards.decks.Deck;
 import mage.cards.l.LotusField;
 import mage.cards.m.MassHysteria;
+import mage.cards.m.MindOverMatter;
+import mage.cards.m.MossDiamond;
 import mage.cards.p.PemminsAura;
 import mage.cards.s.SarythTheVipersFang;
+import mage.cards.s.SimicSignet;
+import mage.cards.t.TalismanOfUnity;
 import mage.cards.u.UndiscoveredParadise;
 import mage.constants.MultiplayerAttackOption;
 import mage.constants.RangeOfInfluence;
@@ -37,7 +46,7 @@ public class TestMain {
 	public static void main(String[] args) {
 		BasicConfigurator.configure();
 		//simulate game set up
-		TestTriggerOptionPlayer testPlayer = new TestTriggerOptionPlayer("test");
+		TreeSearchPlayer testPlayer = new TreeSearchPlayer("test");
 		AlwaysPassPlayer testPlayer2 = new AlwaysPassPlayer(new UUID(1,1),"test2");
 		UUID owner = testPlayer.getId();
 		
@@ -48,18 +57,18 @@ public class TestMain {
 		AnabaShaman testAnaba = new AnabaShaman(owner,info);
 		Plains testPlains = new Plains(owner,info);
 		
-		TestResolveGame testGame = new TestResolveGame(MultiplayerAttackOption.LEFT,RangeOfInfluence.ALL,new LondonMulligan(0),20,7);
-		
-//		TestGame testGame = new TestGame(new SpanningTree(testPlayer));
-		testGame.setSimulation(false);
-		//test
-		testPlayer.init(testGame,true);
-		testPlayer2.init(testGame,true);
-		testGame.addPlayer(testPlayer,new Deck());
-		testGame.addPlayer(testPlayer2,new Deck());
-		
-		System.out.println(testGame.getStartingLife());
-		System.out.println(testGame.getPlayer(testPlayer2.getId()).getLibrary().size());
+//		TestResolveGame testGame = new TestResolveGame(MultiplayerAttackOption.LEFT,RangeOfInfluence.ALL,new LondonMulligan(0),20,7);
+		SpanningTree simulation = new SpanningTree(testPlayer, testPlayer2);
+		TestGame testGame = simulation.getRootGame();
+//		testGame.setSimulation(false);
+//		//test
+//		testPlayer.init(testGame,true);
+//		testPlayer2.init(testGame,true);
+//		testGame.addPlayer(testPlayer,new Deck());
+//		testGame.addPlayer(testPlayer2,new Deck());
+//		
+//		System.out.println(testGame.getStartingLife());
+//		System.out.println(testGame.getPlayer(testPlayer2.getId()).getLibrary().size());
 		
 		ArrayList<PermanentCard> lands2 = lands(6,owner,testGame);
 		PermanentCard anabafield = new PermanentCard(new AnabaShaman(owner,info),owner,testGame);
@@ -68,18 +77,35 @@ public class TestMain {
 		AccursedCentaur test_sacrifice_card = new AccursedCentaur(owner, info);
 		PermanentCard test_sacrifice = new PermanentCard(test_sacrifice_card,owner,testGame);		
 		
-		SarythTheVipersFang combo_card_1 = new SarythTheVipersFang(owner,info);
-		LotusField combo_card_2 = new LotusField(owner,info);
-		PemminsAura combo_card_3 = new PemminsAura(owner,info);
+		CardSetInfo sarythInfo = new CardSetInfo("Saryth","","",Rarity.COMMON);
+		CardSetInfo lotusInfo = new CardSetInfo("Lotus","","",Rarity.COMMON);
+		CardSetInfo pemminsInfo = new CardSetInfo("Pemmins","","",Rarity.COMMON);
+		CardSetInfo azamiInfo = new CardSetInfo("Azami","","",Rarity.COMMON);
+		CardSetInfo mindInfo = new CardSetInfo("MindOver","","",Rarity.COMMON);
+		
+		AzamiLadyOfScrolls combo_card_1 = new AzamiLadyOfScrolls(owner, azamiInfo);
+		MindOverMatter combo_card_2 = new MindOverMatter(owner, mindInfo);
+//		SarythTheVipersFang combo_card_1 = new SarythTheVipersFang(owner,sarythInfo);
+//		LotusField combo_card_2 = new LotusField(owner,lotusInfo);
+//		PemminsAura combo_card_3 = new PemminsAura(owner,pemminsInfo);
 		MassHysteria mass_hysteria = new MassHysteria(owner,info);
+		
 		PermanentCard mass_hysteria_per = new PermanentCard(mass_hysteria,owner,testGame);
 		System.out.println(combo_card_1.getManaValue());
 		System.out.println(combo_card_2.getManaValue());
-		System.out.println(combo_card_3.getManaValue());
+//		System.out.println(combo_card_3.getManaValue());
 		
-		ArrayList<PermanentCard> lands = lands(combo_card_1.getManaValue()+combo_card_2.getManaValue()+combo_card_3.getManaValue()+5,owner,testGame);
+		ArrayList<PermanentCard> lands = lands(combo_card_1.getManaValue()+combo_card_2.getManaValue()+5,owner,testGame);
 		lands.add(mass_hysteria_per);
-		SpanningTree simulation = new SpanningTree(testPlayer, testPlayer2);
+		
+		hand.add(combo_card_1);
+		hand.add(combo_card_2);
+//		hand.add(combo_card_3);
+		simulation.getRootGame().cheat(testPlayer.getId(),library(testPlayer.getId(),testGame), hand, lands, new ArrayList<Card>(), new ArrayList<Card>());
+		System.out.println(testPlayer.getHand());
+		System.out.println("opponent library size : " + testPlayer2.getLibrary().size());
+//		testGame.cheat(testPlayer2.getId(),library(testPlayer2.getId(),testGame), hand2, lands2, new ArrayList<Card>(), new ArrayList<Card>());
+		simulation.startSim();
 		//test combination
 //		ArrayList<ArrayList<Card>> combi_test_output = new ArrayList<ArrayList<Card>>();
 //		ArrayList<Card> temp = new ArrayList<Card>();
@@ -223,14 +249,16 @@ public class TestMain {
 	
 	private static ArrayList<PermanentCard> lands(int num,UUID ownerUuid,GameImpl game){
 		ArrayList<PermanentCard> paradises = new ArrayList<PermanentCard>();
-		CardSetInfo cardInfo = new CardSetInfo("","","",Rarity.COMMON);
+		CardSetInfo cardInfo = new CardSetInfo("Paradise","","1",Rarity.COMMON);
 		while(paradises.size() < num) {
+//			paradises.add(new PermanentCard(new TalismanOfUnity(ownerUuid, cardInfo),ownerUuid,game));
 //			paradises.add(new PermanentCard(new Plains(ownerUuid, cardInfo),ownerUuid,game));
 //			paradises.add(new PermanentCard(new Island(ownerUuid, cardInfo),ownerUuid,game));
 //			paradises.add(new PermanentCard(new Mountain(ownerUuid, cardInfo),ownerUuid,game));
-			paradises.add(new PermanentCard(new Swamp(ownerUuid, cardInfo),ownerUuid,game));
+//			paradises.add(new PermanentCard(new Swamp(ownerUuid, cardInfo),ownerUuid,game));
+//			paradises.add(new PermanentCard(new Forest(ownerUuid, cardInfo),ownerUuid,game));
 //			paradises.add(new PermanentCard(new AnabaShaman(ownerUuid,cardInfo),ownerUuid,game));
-//			paradises.add(new PermanentCard(new UndiscoveredParadise(ownerUuid, cardInfo),ownerUuid,game));
+			paradises.add(new PermanentCard(new UndiscoveredParadise(ownerUuid, cardInfo),ownerUuid,game));
 		}
 		
 		return paradises;
@@ -238,8 +266,8 @@ public class TestMain {
 
 	private static ArrayList<Card> library(UUID ownerUuid,GameImpl game){
 		ArrayList<Card> mockLibrary = new ArrayList<Card>();
-		CardSetInfo cardInfo = new CardSetInfo("","","",Rarity.COMMON);
-		for(int i = 0;i<6;i++) {
+		CardSetInfo cardInfo = new CardSetInfo("Paradise","","",Rarity.COMMON);
+		for(int i = 0;i<20;i++) {
 			mockLibrary.add(new UndiscoveredParadise(ownerUuid, cardInfo));
 		}
 		return mockLibrary;

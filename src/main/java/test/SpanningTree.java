@@ -5,6 +5,7 @@ import java.util.HashMap;
 
 import mage.cards.decks.Deck;
 import mage.game.Game;
+import mage.game.GameOptions;
 import mage.players.Player;
 import test.TestTreePlayer.NextAction;
 
@@ -14,15 +15,23 @@ public class SpanningTree {
 	private TestNode current;
 	private HashMap<TestNode,ArrayList<TestNode>> tree;
 	private TestGame rootGame;
-	private TestTreePlayer player;
+	
+	public TestGame getRootGame() {
+		return rootGame;
+	}
+
+	public void setRootGame(TestGame rootGame) {
+		this.rootGame = rootGame;
+	}
+
+	private TreeSearchPlayer player;
 	private Player opponent;
 	
-	public SpanningTree(TestTreePlayer player1,Player player2) {
+	public SpanningTree(TreeSearchPlayer player1,Player player2) {
 		// TODO Auto-generated constructor stub
 		
 		this.player = player1;
 		this.opponent = player2;
-		player.setTree(this);
 		this.rootGame = new TestGame(this);
 		player.init(rootGame,true);
 		opponent.init(rootGame,true);
@@ -31,21 +40,19 @@ public class SpanningTree {
 		
 	}
 	
-	
-	public TestTreePlayer getPlayer() {
+	public TreeSearchPlayer getPlayer() {
 		return player;
 	}
 
 
-
-	public void setPlayer(TestTreePlayer player) {
+	public void setPlayer(TreeSearchPlayer player) {
 		this.player = player;
 	}
 
 
 
 	public void triggeringProcess(){
-		player.setNextAction(NextAction.TRIGGERED);
+//		player.setNextAction(NextAction.TRIGGERED);
 		current.expand();
 	}
 	
@@ -63,7 +70,13 @@ public class SpanningTree {
 	}
 	
 	public void startSim() {
+		player.updateRange(rootGame);
+		opponent.updateRange(rootGame);
+		GameOptions testGameOptions = new GameOptions();
+		testGameOptions.testMode = true;
+		rootGame.setGameOptions(testGameOptions);
 		rootGame.startSim(player.getId());
+		System.out.println("opponent life: "+opponent.getLife());
 	}
 	
 	public TestNode getRoot() {
