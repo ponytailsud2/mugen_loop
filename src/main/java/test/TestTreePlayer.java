@@ -99,13 +99,13 @@ public class TestTreePlayer extends PlayerImpl {
 	private NextAction nextAction;
 
 	private transient ManaCost currentUnpaidMana;
-
 	private int level;
 
 	private StackObject resolvingAbility;
 	private int chooseUseRollBack = 0;
 	// {Level:answer for this Lv}
 	private HashMap<Integer, Boolean> chooseUseMap = new HashMap<Integer, Boolean>();
+	private HashMap<Integer, List<Ability>> chooseTrigger = new HashMap<Integer, List<Ability>>();
 	private HashMap<Integer, Integer> chooseReplacementMap = new HashMap<Integer, Integer>();
 	private HashMap<Integer, TargetCard> chooseCardsMap = new HashMap<Integer, TargetCard>();
 //	private SpanningTree tree;
@@ -114,7 +114,7 @@ public class TestTreePlayer extends PlayerImpl {
 	private ArrayList<NextAction> resolveMem = new ArrayList<NextAction>();
 	
 	public enum NextAction {
-		PRIORITY, TRIGGERED, CHOOSE_USE, CHOOSE_REPLACEMENT, CHOOSE, CHOOSE_CARD
+		PRIORITY, TRIGGERED, CHOOSE_USE, CHOOSE_REPLACEMENT, CHOOSE, CHOOSE_CARD, CHOOSE_TRIGGER
 	}
 
 	public TestTreePlayer(UUID uuid) {
@@ -158,6 +158,14 @@ public class TestTreePlayer extends PlayerImpl {
 //	public void setTree(SpanningTree tree) {
 //		this.tree = tree;
 //	}
+
+	public int getLevel() {
+		return level;
+	}
+
+	public void setLevel(int level) {
+		this.level = level;
+	}
 
 	protected List<ActivatedAbility> getPlayableAbilities(Game game) {
 		List<ActivatedAbility> playables = getPlayable(game, true);
@@ -1304,6 +1312,10 @@ public static void combinationUtil(ArrayList<UUID> element_list,ArrayList<ArrayL
 
 	public void setChooseCardsMap(HashMap<Integer, TargetCard> chooseCardsMap) {
 		this.chooseCardsMap = chooseCardsMap;
+	}
+	
+	public void addChooseTrigger(List<Ability> option) {
+		chooseTrigger.put(level, option);
 	}
 
 }

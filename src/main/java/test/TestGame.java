@@ -29,6 +29,7 @@ import mage.game.turn.PreCombatMainPhase;
 import mage.game.turn.PreCombatMainStep;
 import mage.game.turn.TurnMod;
 import mage.players.Player;
+import test.TestTreePlayer.NextAction;
 
 public class TestGame extends GameImpl{
 	
@@ -39,6 +40,14 @@ public class TestGame extends GameImpl{
 	private ContinuousEffects applyingReplaceEffects;
 	private TestGame resolvingEffectGame;
 	private StackObject resolvingEffect;
+	private ArrayList<TriggeredAbility> resolvingTriggerAbilities;
+	public ArrayList<TriggeredAbility> getResolvingTriggerAbilities() {
+		return resolvingTriggerAbilities;
+	}
+
+	public void setResolvingTriggerAbilities(ArrayList<TriggeredAbility> resolvingTriggerAbilities) {
+		this.resolvingTriggerAbilities = resolvingTriggerAbilities;
+	}
 	private ArrayList<CurrentAction> currentAction = new ArrayList<CurrentAction>();
 	private int infiniteLoopCounter = 0;
 	
@@ -60,6 +69,7 @@ public class TestGame extends GameImpl{
 		this.currentAction = new ArrayList<CurrentAction>();
 		this.spanningTree = spanningTree;
 		
+		
 	}
 	
 	public ContinuousEffects getApplyingReplaceEffects() {
@@ -78,6 +88,15 @@ public class TestGame extends GameImpl{
 	public TestGame(final TestGame game) {
 		super(game);
 		this.spanningTree = game.spanningTree;
+		this.triggeringOptions = game.triggeringOptions;
+		this.currentAction = game.currentAction;
+		this.savedStates = game.savedStates;
+		this.applyingReplaceEffects = game.applyingReplaceEffects;
+		this.resolvingEffect = game.resolvingEffect;
+		if (game.resolvingTriggerAbilities != null){
+			this.resolvingTriggerAbilities = new ArrayList<TriggeredAbility>(game.resolvingTriggerAbilities);
+		}
+		
 	}
 	
 	public void startSim(UUID nextPlayerId) {
@@ -116,7 +135,9 @@ public class TestGame extends GameImpl{
                         while (!player.isPassed() && player.canRespond() && !isPaused() && !checkIfGameIsOver()) {
                             if (!resuming) {
                                 // 603.3. Once an ability has triggered, its controller puts it on the stack as an object that's not a card the next time a player would receive priority
-                                checkStateAndTriggered();
+                                System.out.println("stack" + this.state.getStack());
+                            	if(checkStateAndTriggered())
+                            		System.out.println("stack after check state: " + this.state.getStack());
                                 applyEffects();
                                 if (state.getStack().isEmpty()) {
                                     resetLKI();
@@ -232,8 +253,9 @@ public class TestGame extends GameImpl{
 	
 	@Override
 	public boolean checkTriggered() {
-        boolean played = false;
+		boolean played = false;
         state.getTriggers().checkStateTriggers(this);
+        resolvingTriggerAbilities = null;
         for (UUID playerId : state.getPlayerList(state.getActivePlayerId())) {
             Player player = getPlayer(playerId);
             while (player.canRespond()) { // player can die or win caused by triggered abilities or leave the game
@@ -242,6 +264,10 @@ public class TestGame extends GameImpl{
                 
                 if (abilities.isEmpty()) {
                     break;
+                }
+                
+                if(resolvingTriggerAbilities != null && resolvingTriggerAbilities.size() > 1) {
+                	break;
                 }
                 
                 // triggered abilities that don't use the stack have to be executed first (e.g. Banisher Priest Return exiled creature
@@ -257,12 +283,23 @@ public class TestGame extends GameImpl{
                 if (abilities.isEmpty()) {
                     break;
                 }
-                
+                resolvingTriggerAbilities = new ArrayList<TriggeredAbility>(abilities);
+//                System.out.println("print resolving : "+resolvingTriggerAbilities);
+                //check option
                 for(TriggeredAbility triggering : abilities) {
                 	for(Ability option: player.getPlayableOptions(triggering, this)) {
                 		triggeringOptions.put(option, triggering);
+//                		System.out.println(option.getFirstTarget());
+//                		System.out.println(triggering.getFirstTarget());
+//                		System.out.println(triggering.getId());
                 	}
                 }               
+                
+//                if(triggeringOptions.size() > 1) {
+//                	for(Ability ability : triggeringOptions.values()) {
+//                		System.out.println(ability.getId());
+//                	}
+//                }
                 
 //                if(player instanceof TestTreePlayer) {
 //                	spanningTree.triggeringProcess();
@@ -270,6 +307,7 @@ public class TestGame extends GameImpl{
 //                	triggeringOptions.clear();
 //                	break;
 //                }
+                
                 if (abilities.size() == 1) {
 //                	System.out.println("option size: "+player.getPlayableOptions(abilities.get(0), this).size());
                 	System.out.println("trigger option : "+player.getPlayableOptions(abilities.get(0), this));
@@ -277,8 +315,37 @@ public class TestGame extends GameImpl{
                 		System.out.println("optionID :"+ta.getId());
                 	}
                     state.removeTriggeredAbility(abilities.get(0));
-                    played |= player.triggerAbility(abilities.get(0), this);
-                } else {
+                    //check this TODO
+//                    System.out.println(spanningTree.getCurrent().getAction());
+                    //TODO check abilities and option. No option = []
+                    List<Ability> option = player.getPlayableOptions(abilities.get(0), this);
+                    if (option.size() == 1) {
+                    	played |= player.triggerAbility((TriggeredAbility)option.get(0), this);
+                    }
+                    else if (option.size() == 0) {
+                    	played |= player.triggerAbility(abilities.get(0), this);
+                    }
+                    else {
+                    	//TO DO
+                    	this.pause();
+                    	if(player instanceof TestTreePlayer) {
+                    		((TestTreePlayer)player).setNextAction(NextAction.CHOOSE_TRIGGER);
+                    		System.out.println("check stack: " + state.getStack() );
+                    		((TestTreePlayer)player).addChooseTrigger(option);
+                    	}
+//                    	played |= player.triggerAbility(abilities.get(0), this);
+                    }
+                
+                } else if(abilities.size()>1) {
+                	this.pause();
+                	if(player instanceof TestTreePlayer) {
+                		((TestTreePlayer)player).setNextAction(NextAction.CHOOSE_TRIGGER);
+//                		((TestTreePlayer)player).addChooseTrigger(option);
+                		System.out.println("check stack: " + state.getStack() );
+                		
+                	}
+                }
+                else {
                     TriggeredAbility ability = player.chooseTriggeredAbility(abilities, this);
                     if (ability != null) {
                         state.removeTriggeredAbility(ability);
@@ -418,7 +485,7 @@ public class TestGame extends GameImpl{
 	public StackObject getResolvingEffect() {
 		return resolvingEffect;
 	}
-
+	//change to map
 	public void setResolvingEffect(StackObject resolvingEffect) {
 		this.resolvingEffect = resolvingEffect;
 	}

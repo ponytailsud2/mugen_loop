@@ -6,8 +6,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.Set;
 import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,6 +29,8 @@ import mage.abilities.mana.ManaAbility;
 import mage.cards.a.AzamiLadyOfScrolls;
 import mage.cards.basiclands.BasicLand;
 import mage.cards.m.MindOverMatter;
+import mage.cards.p.PemminsAura;
+import mage.cards.s.SparringMummy;
 import mage.cards.u.UndiscoveredParadise;
 import mage.constants.CardType;
 import mage.game.ExileZone;
@@ -34,6 +38,7 @@ import mage.game.Game;
 import mage.game.GameState;
 import mage.game.permanent.Permanent;
 import mage.game.permanent.PermanentCard;
+import mage.game.stack.StackAbility;
 import mage.game.stack.StackObject;
 import mage.players.Player;
 import mage.target.Target;
@@ -58,13 +63,16 @@ public class TestNode {
 	private Hashtable<String,Integer> parentStates;
 	private int tappedPermanentCount = 0;
 	private int handCount = 0;
-	private int loopStepCount = 0;
 	private int level;
 	private ArrayList<TargetCard> chooseCardOptionTemp = new ArrayList<TargetCard>();
 	private HashMap<Integer,Ability> action_path;
 	//
-	private Stack<MageItem> availableTarget = new Stack<MageItem>();
+	private Hashtable<Integer,Integer> mana_diff;
+	private Hashtable<Integer,Integer> hand_diff;
+	private Hashtable<Integer, Integer> tapped_diff;
 	
+	private Stack<MageItem> availableTarget = new Stack<MageItem>();
+	private Hashtable<Integer,List<Ability>> trigger_state = new Hashtable<Integer,List<Ability>>();
 	
 	
 	//use String gameState.getValue as gameState
@@ -74,6 +82,7 @@ public class TestNode {
 		this.playerId = playerId;
 		this.terminal = game.getPlayer(playerId).getPlayable(game, true).isEmpty();
 		this.parentStates = new Hashtable<String,Integer>();
+		this.tapped_diff = new Hashtable<Integer, Integer>();
 		this.level = 0;
 		this.action_path = new HashMap<Integer,Ability>();
 //		this.chooseUse = true;
@@ -88,12 +97,27 @@ public class TestNode {
 		this.parent = parent;
 		this.action = action;
 		this.level = parent.level + 1;
+		this.trigger_state = parent.trigger_state;
 		this.parentStates = new Hashtable<String,Integer>(parent.parentStates);
+		this.tapped_diff = new Hashtable<Integer, Integer>(parent.tapped_diff);
 		if(!this.parentStates.containsKey(parent.getResourceStateValues(parent.game))) {
 			this.parentStates.put(parent.getResourceStateValues(parent.game), 0);
 		}
 		else {
 			this.parentStates.put(parent.getResourceStateValues(parent.game), this.parentStates.get(parent.getResourceStateValues(parent.game))+1);
+		}
+		this.tappedPermanentCount = game.getBattlefield().getAllPermanents().stream()
+                .filter(Permanent::isTapped)
+                .collect(Collectors.toList()).size();
+		if (this.tappedPermanentCount < this.parent.tappedPermanentCount){
+			int diff = this.tappedPermanentCount - this.parent.tappedPermanentCount;
+			if(this.tapped_diff.containsKey(diff)) {
+				tapped_diff.put(diff, tapped_diff.get(diff)+1);
+			}
+			else {
+				tapped_diff.put(diff, 1);
+			}
+			
 		}
 		this.action_path = new HashMap<Integer,Ability>(parent.action_path);
 		if(action != null) {
@@ -116,6 +140,49 @@ public class TestNode {
 //		this.parentStates.add(parent.getGameStateValue(parent.game));
 	}
 	
+	public TestNode(TestNode parent, Game game, List<Ability> trigger) {
+		this.playerId = parent.playerId;
+		this.game = game;
+		this.stateValue = this.getResourceStateValues(game);
+		this.parent = parent;
+		this.stackEffect = parent.stackEffect;
+		this.level = parent.level + 1;
+		this.parentStates = parent.parentStates;
+		this.trigger_state = parent.trigger_state;
+		this.action = parent.action;
+		trigger_state.put(this.level, trigger);
+		this.tapped_diff = new Hashtable<Integer, Integer>(parent.tapped_diff);
+		
+		if(!this.parentStates.containsKey(parent.getResourceStateValues(parent.game))) {
+			this.parentStates.put(parent.getResourceStateValues(parent.game), 0);
+		}
+		else {
+			this.parentStates.put(parent.getResourceStateValues(parent.game), this.parentStates.get(parent.getResourceStateValues(parent.game))+1);
+		}
+		this.tappedPermanentCount = game.getBattlefield().getAllPermanents().stream()
+                .filter(Permanent::isTapped)
+                .collect(Collectors.toList()).size();
+		if (this.tappedPermanentCount < this.parent.tappedPermanentCount){
+			int diff = this.tappedPermanentCount - this.parent.tappedPermanentCount;
+			if(this.tapped_diff.containsKey(diff)) {
+				tapped_diff.put(diff, tapped_diff.get(diff)+1);
+			}
+			else {
+				tapped_diff.put(diff, 1);
+			}
+			
+		}
+		this.action_path = new HashMap<Integer,Ability>(parent.action_path);
+		if(action != null) {
+			System.out.println("This action : " + action);
+			this.action_path.put(this.level, action);
+			System.out.println("action path : "+ action_path);
+			System.out.println("=======================");
+		}
+//		this.parentStates.add(parent.getGameStateValue(parent.game));
+		
+	}
+	
 	public String getResourceStateValues(Game game) {
 		StringBuilder state = threadLocalBuilder.get();
 		GameState gs = game.getState();
@@ -135,6 +202,15 @@ public class TestNode {
 		}
 		Collections.sort(perms);
 		state.append(perms);
+		state.append("mana");
+		for(Player player : gs.getPlayers().values()) {
+			if(player.getId() == playerId) {
+				state.append(player.getManaAvailable(game));
+			}
+//			state.append("library").append(player.getLibrary().size());
+//			state.append("grayard");
+//			state.append(player.getGraveyard().getValue(game));
+		}
 		state.append("spells|");
 		for(StackObject spell : gs.getStack()) {
 			state.append(spell.getControllerId()).append(spell.getName());
@@ -337,7 +413,7 @@ public class TestNode {
 //				System.out.println("check game over: "+sim.checkIfGameIsOver());
 //				System.out.println("check game over origin: "+game.checkIfGameIsOver());
 				TestTreePlayer simPlayer = (TestTreePlayer) sim.getPlayer(player.getId());
-				
+				simPlayer.setLevel(this.level);
 				if(ability instanceof SpecialAction) {
 					ArrayList<CurrentAction> currentActions = ((TestGame)sim).getCurrentAction();
 					if(!currentActions.contains(CurrentAction.SPECIAL)) {
@@ -368,6 +444,7 @@ public class TestNode {
 					}
 					if (simPlayer.activateAbility((ActivatedAbility)ability, sim)) {
 						sim.resume();
+						System.out.println("check resume");
 //						if(this.action == null) {
 //							this.action = ability;
 //						}
@@ -469,10 +546,166 @@ public class TestNode {
 				
 			}
 			break;
+		case CHOOSE_TRIGGER:
+			System.out.println("choose trigger");
+			System.out.println(game.getStack());
+			System.out.println(game.getBattlefield());
+			System.out.println(((TestGame)game).getCurrentAction());
+			System.out.println(((TestGame)game).getResolvingEffect());
+			System.out.println("lv "+level);
+			
+			//check .isSameInstance()
+			
+//			TestGame sim = ((TestGame)game).copy();
+			System.out.println("check ID");
+//			System.out.println(sim.getResolvingTriggerAbilities().get(0).getId());
+//			System.out.println(((TestGame)game).getResolvingTriggerAbilities().get(0).getId());
+//			System.out.println("check is same : "+sim.getResolvingTriggerAbilities().get(0).isSameInstance(((TestGame)game).getResolvingTriggerAbilities().get(0)));
+//			System.out.println("resolving : "+sim.getResolvingTriggerAbilities());
+//			TestTreePlayer simPlayer = (TestTreePlayer) sim.getPlayer(player.getId());
+			//TODO need permutation when there are more than one trigger ability
+			ArrayList<ArrayList<TriggeredAbility>> permutatedAbilties = arrayListPermutation(((TestGame)game).getResolvingTriggerAbilities());
+//			ArrayList<ArrayList<TriggeredAbility>> permutatedTargetedAbilities = new ArrayList<ArrayList<TriggeredAbility>>();
+
+//			System.out.println("resolving : "+sim.getResolvingTriggerAbilities());
+			for(ArrayList<TriggeredAbility> abilityList:permutatedAbilties ) {
+				for(Ability stackAbi:abilityList) {
+					((TestGame)game).getStack().push(new StackAbility(stackAbi, playerId));
+				}
+				ArrayList<List<Ability>> targetedAbilities = spanningTrigger(new ArrayList<TriggeredAbility>(abilityList), ((TestGame)game).getPlayer(player.getId()), ((TestGame)game));
+//				System.out.println(targetedAbilities);
+				//TO DO smth that change target to current stack
+				
+				//clear stack
+				((TestGame)game).getStack().clear();				
+				for (List<Ability> permutatedTargetedAbilities:targetedAbilities) {
+					TestGame sim = ((TestGame)game).copy();
+					TestTreePlayer simPlayer = (TestTreePlayer) sim.getPlayer(player.getId());
+					for(Ability eachAbility:permutatedTargetedAbilities) {
+						System.out.println(eachAbility.getFirstTarget());
+						for(Target target:eachAbility.getTargets()) {
+							for(int i=0;i<target.getTargets().size();i++) {
+								Set<UUID> targetPool = new HashSet<UUID>(target.possibleTargets(eachAbility.getSourceId(),playerId, sim));
+								targetPool.addAll(target.getTargets());
+								for(UUID id:targetPool) {
+									if(target.contains(id)) {
+										target.remove(id);
+										target.add(id, sim);
+									}
+								}
+							}
+							
+						}
+						sim.getStack().push(new StackAbility(eachAbility, playerId));
+					}
+					sim.resume();
+//					for(Ability eachAbility:permutatedTargetedAbilities) {
+//						System.out.println(eachAbility.getFirstTarget());
+//						if(eachAbility.getSourceObject(game) instanceof PermanentCard&& ((PermanentCard)eachAbility.getSourceObject(game)).getCard().getCardType().contains(CardType.CREATURE)  &&((PermanentCard)((PermanentCard)eachAbility.getSourceObject(game)).getCard()).getCard() instanceof SparringMummy) {
+//							System.out.println();
+//						}
+
+//					}
+					
+					children.add(new TestNode(this,sim,permutatedTargetedAbilities));
+				}
+				
+//				String key = "";
+//				ArrayList<TriggeredAbility> targetedAbilities = new ArrayList<TriggeredAbility>();
+//				for(TriggeredAbility triggeredAbility : abilityList) {
+//					key += triggeredAbility.getId();
+//					List<Ability> options = player.getPlayableOptions(triggeredAbility, sim);
+//					if(options.isEmpty()) {
+//						targetedAbilities.add(triggeredAbility);
+//					}
+//					else {
+//						
+//					}
+//					for(Ability option: player.getPlayableOptions(triggeredAbility, sim)) {
+////		            		triggeringOptions.put(option, triggering);
+//		            		System.out.println(option.getFirstTarget());
+////		            		System.out.println(triggering.getFirstTarget());
+//		            		
+////		            		System.out.println(triggering.getId());
+//		            		sim.getStack().push(new StackAbility(triggeredAbility, playerId));
+//		            	
+//		            } 
+//					
+//				}
+			}
+			
+//			sim.getStack().add(((TestGame)game).getResolvingEffect());
+//			System.out.println(sim.getStack());
+			break;
 		default:
 			break;
 		}
 //		game = null;
+	}
+	
+	public ArrayList<List<Ability>> spanningTrigger(ArrayList<TriggeredAbility> array,Player player,Game sim){
+		ArrayList<List<Ability>> ans = new ArrayList<List<Ability>>();
+		
+		if(array.size() == 1) {
+			List<Ability> playable = player.getPlayableOptions(array.get(0), sim);
+			if(playable.isEmpty()) {
+				List<Ability> noOptionPlayable = new ArrayList<Ability>();
+				noOptionPlayable.add(array.get(0));
+				ans.add(noOptionPlayable);
+			}
+			else {
+				for(Ability ability:playable) {
+					List<Ability> optionPlayable = new ArrayList<Ability>();
+					optionPlayable.add(ability);
+					ans.add(optionPlayable);
+				}
+			}
+			return ans;
+		}
+		
+		TriggeredAbility lastElement = array.remove(array.size()-1);
+		ArrayList<List<Ability>> recursive = spanningTrigger(array, player, sim);
+		List<Ability> lastEOption = player.getPlayableOptions(lastElement, sim);
+		if(lastEOption.isEmpty()) {
+			for(List<Ability> recursiveOption : recursive) {
+				List<Ability> addedOption = new ArrayList<Ability>(recursiveOption);
+				addedOption.add(lastElement);
+				ans.add(addedOption);
+			}
+		}
+		else {
+			for(Ability option: lastEOption) {
+				for(List<Ability> recursiveOption : recursive) {
+					List<Ability> addedOption = new ArrayList<Ability>(recursiveOption);
+					addedOption.add(option);
+					ans.add(addedOption);
+				}
+			}
+		}
+		
+		
+		return ans;
+		
+	}
+	
+	public ArrayList<ArrayList<TriggeredAbility>> arrayListPermutation(ArrayList<TriggeredAbility> array){
+		ArrayList<ArrayList<TriggeredAbility>> ans = new ArrayList<ArrayList<TriggeredAbility>>();
+		
+		if(array.size() == 0) {
+			ans.add(array);
+			return ans;
+		}
+		TriggeredAbility firstAbility = array.remove(0);
+		ArrayList<ArrayList<TriggeredAbility>> recursive = arrayListPermutation(array);
+		for(ArrayList<TriggeredAbility> element : recursive) {
+			for(int i = 0;i <= element.size();i++) {
+				ArrayList<TriggeredAbility> temp = new ArrayList<TriggeredAbility>(element);
+				temp.add(i,firstAbility);
+				ans.add(temp);
+			}
+		}
+		return ans;
+		
 	}
 	
 	public ArrayList<TargetCard> getChooseCardOptionTemp() {
@@ -527,6 +760,7 @@ public class TestNode {
 			}
 		}
 		
+		
 		//check infinite draw or mill
 		for(UUID player: this.game.getPlayerList()) {
 			if(player == this.playerId) {
@@ -537,9 +771,14 @@ public class TestNode {
 		}
 		
 		//check no resources reduces
-		this.tappedPermanentCount = game.getBattlefield().getAllPermanents().stream()
-                .filter(Permanent::isTapped)
-                .collect(Collectors.toList()).size();
+		Enumeration<Integer> tapped_keys = tapped_diff.keys();
+        while (tapped_keys.hasMoreElements()) {
+            String key = keys.nextElement();
+            if(parentStates.get(key) >= 5) {
+            	return true;
+            }
+//            System.out.println("Key: " + key + ", Value: " + parentStates.get(key));
+        }
 		System.out.println("tapped: "+tappedPermanentCount);
 		System.out.println("player: "+ game.getPlayer(playerId));
 		System.out.println("mana: " + game.getPlayer(playerId).getManaAvailable(game));

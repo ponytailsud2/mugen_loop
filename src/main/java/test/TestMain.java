@@ -10,6 +10,8 @@ import mage.cards.Card;
 import mage.cards.CardSetInfo;
 import mage.cards.a.AbbeyMatron;
 import mage.cards.a.AccursedCentaur;
+import mage.cards.a.AdarkarValkyrie;
+import mage.cards.a.AetherFlash;
 import mage.cards.a.AnabaShaman;
 import mage.cards.a.AzamiLadyOfScrolls;
 import mage.cards.b.BattleflightEagle;
@@ -20,13 +22,17 @@ import mage.cards.basiclands.Plains;
 import mage.cards.basiclands.Swamp;
 import mage.cards.c.CultivatorsCaravan;
 import mage.cards.decks.Deck;
+import mage.cards.l.LeatherbackBaloth;
 import mage.cards.l.LotusField;
 import mage.cards.m.MassHysteria;
 import mage.cards.m.MindOverMatter;
 import mage.cards.m.MossDiamond;
 import mage.cards.p.PemminsAura;
+import mage.cards.p.PhyrexianAltar;
 import mage.cards.s.SarythTheVipersFang;
+import mage.cards.s.ShadrixSilverquill;
 import mage.cards.s.SimicSignet;
+import mage.cards.s.SparringMummy;
 import mage.cards.t.TalismanOfUnity;
 import mage.cards.u.UndiscoveredParadise;
 import mage.constants.MultiplayerAttackOption;
@@ -80,27 +86,50 @@ public class TestMain {
 		CardSetInfo sarythInfo = new CardSetInfo("Saryth","","",Rarity.COMMON);
 		CardSetInfo lotusInfo = new CardSetInfo("Lotus","","",Rarity.COMMON);
 		CardSetInfo pemminsInfo = new CardSetInfo("Pemmins","","",Rarity.COMMON);
+		
 		CardSetInfo azamiInfo = new CardSetInfo("Azami","","",Rarity.COMMON);
 		CardSetInfo mindInfo = new CardSetInfo("MindOver","","",Rarity.COMMON);
 		
-		AzamiLadyOfScrolls combo_card_1 = new AzamiLadyOfScrolls(owner, azamiInfo);
-		MindOverMatter combo_card_2 = new MindOverMatter(owner, mindInfo);
+		CardSetInfo AdarkarInfo = new CardSetInfo("Adarkar", "", "", Rarity.COMMON);
+		CardSetInfo SparringInfo = new CardSetInfo("Sparring","","",Rarity.COMMON);
+		CardSetInfo PhyrexianAltarInfo = new CardSetInfo("Phyrexian Altar","","",Rarity.COMMON);
+		
+		CardSetInfo ShadrixInfo = new CardSetInfo("Shadrix Silver","","",Rarity.COMMON);
+		
+		CardSetInfo AetherFalshInfo = new CardSetInfo("Aether Flash","","",Rarity.COMMON);
+		
+		CardSetInfo LeatherbackInfo = new CardSetInfo("Leatherback","","",Rarity.COMMON);
+		
+//		AzamiLadyOfScrolls combo_card_1 = new AzamiLadyOfScrolls(owner, azamiInfo);
+//		MindOverMatter combo_card_2 = new MindOverMatter(owner, mindInfo);
+		
 //		SarythTheVipersFang combo_card_1 = new SarythTheVipersFang(owner,sarythInfo);
 //		LotusField combo_card_2 = new LotusField(owner,lotusInfo);
 //		PemminsAura combo_card_3 = new PemminsAura(owner,pemminsInfo);
-		MassHysteria mass_hysteria = new MassHysteria(owner,info);
 		
+//		ShadrixSilverquill combo_card_1 = new ShadrixSilverquill(owner,ShadrixInfo);
+		
+		AdarkarValkyrie combo_card_1 = new AdarkarValkyrie(owner, AdarkarInfo);
+		SparringMummy combo_card_2 = new SparringMummy(owner, SparringInfo);
+		PhyrexianAltar combo_card_3 = new PhyrexianAltar(owner, PhyrexianAltarInfo);
+		
+//		LeatherbackBaloth leather_back = new LeatherbackBaloth(owner, LeatherbackInfo);
+		MassHysteria mass_hysteria = new MassHysteria(owner,info);
+//		AetherFlash aether_flash = new AetherFlash(owner,AetherFalshInfo);
 		PermanentCard mass_hysteria_per = new PermanentCard(mass_hysteria,owner,testGame);
-		System.out.println(combo_card_1.getManaValue());
-		System.out.println(combo_card_2.getManaValue());
+//		PermanentCard aether_flash_per = new PermanentCard(aether_flash,owner,testGame);
+//		PermanentCard leather_back_per = new PermanentCard(leather_back,owner,testGame);
+		//		System.out.println(combo_card_1.getManaValue());
+//		System.out.println(combo_card_2.getManaValue());
 //		System.out.println(combo_card_3.getManaValue());
 		
-		ArrayList<PermanentCard> lands = lands(combo_card_1.getManaValue()+combo_card_2.getManaValue()+5,owner,testGame);
+		ArrayList<PermanentCard> lands = lands(combo_card_2.getManaValue(),owner,testGame);
 		lands.add(mass_hysteria_per);
-		
+//		lands.add(aether_flash_per);
+//		lands.add(leather_back_per);
 		hand.add(combo_card_1);
 		hand.add(combo_card_2);
-//		hand.add(combo_card_3);
+		hand.add(combo_card_3);
 		simulation.getRootGame().cheat(testPlayer.getId(),library(testPlayer.getId(),testGame), hand, lands, new ArrayList<Card>(), new ArrayList<Card>());
 		System.out.println(testPlayer.getHand());
 		System.out.println("opponent library size : " + testPlayer2.getLibrary().size());
